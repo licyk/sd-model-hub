@@ -15,8 +15,10 @@ The design, the conventions and the known gaps are in [AGENTS.md](AGENTS.md).
 
 ## Install
 
+Install from PyPI:
+
 ```bash
-pip install .            # from a checkout; see "Building" for the web UI
+python -m pip install sd-model-hub
 sd-model-hub --help
 ```
 
