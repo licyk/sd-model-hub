@@ -327,3 +327,22 @@ def test_file_name_parsing():
     assert sanitize_file_name("../../etc/passwd") == "passwd"
     assert sanitize_file_name("CON") == "download.bin"
     assert Path(sanitize_file_name('a<b>:c"d.bin')).name == "a_b__c_d.bin"
+
+
+def test_job_events_carry_a_snapshot_of_the_state_they_announce(hub, server, tmp_path):
+    """A subscriber may serialize an event long after it was published; the payload must not move."""
+    from sd_model_hub.core.events.models import DownloadJobEvent
+
+    server.handler = lambda r: httpx.Response(200, headers={"Content-Length": str(len(BODY))}, stream=DroppingStream(BODY, delay=0.01))
+    seen: list[DownloadJobEvent] = []
+    hub.events.subscribe(lambda e: seen.append(e) if isinstance(e, DownloadJobEvent) else None)
+
+    job = run(hub, DownloadCreate(url="https://files.example/s.safetensors", dest_dir=str(tmp_path / "out")))
+    assert job.state == "completed", job.error
+
+    announced = {e.__event_name__: e.job for e in seen}
+    assert set(announced) == {"download_queued", "download_started", "download_completed"}
+    assert announced["download_queued"].state == "queued"
+    assert announced["download_started"].state == "running"
+    assert announced["download_started"].bytes_done == 0
+    assert announced["download_completed"].state == "completed"

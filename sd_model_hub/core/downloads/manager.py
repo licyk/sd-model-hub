@@ -259,7 +259,7 @@ class DownloadManager:
             self._save(job)
             self._owned.add(job.id)
             self._wake.notify_all()
-        self.events.publish(DownloadQueuedEvent(job=job))
+        self.events.publish(DownloadQueuedEvent(job=job.model_copy()))
         return job
 
     def _find_resumable(self, req: DownloadCreate, dest: Path) -> DownloadJob | None:
@@ -302,7 +302,9 @@ class DownloadManager:
             "failed": DownloadFailedEvent,
             "cancelled": DownloadCancelledEvent,
         }[state]
-        self.events.publish(event_cls(job=job))
+        # A snapshot, not the live job: a subscriber may serialize the event later, on another
+        # thread, while this one keeps writing progress into the same object.
+        self.events.publish(event_cls(job=job.model_copy()))
         with self._lock:
             self._finished.notify_all()
         return job

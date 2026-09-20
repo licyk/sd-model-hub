@@ -5,7 +5,7 @@ import { useDownloadsStore } from '@/stores/downloads';
 import { useUploadsStore } from '@/stores/uploads';
 import { BASE_PATH, BASE_URL } from './baseUrl';
 import { keys } from './queries/keys';
-import { upsertJob } from './queries/downloads';
+import { applyJobEvent, forgetJobs, markRunning } from './queries/downloads';
 import type { DownloadJob, ServerEvents } from './types';
 
 type Listeners = { [K in keyof ServerEvents]: (payload: ServerEvents[K]) => void };
@@ -33,15 +33,21 @@ export function connectSocket(qc: QueryClient): Socket<Listeners> {
 
   for (const name of JOB_EVENTS) {
     socket.on(name, (payload: { job: DownloadJob }) => {
-      qc.setQueryData<DownloadJob[]>(keys.downloads, (old) => upsertJob(old, payload.job));
+      applyJobEvent(qc, payload.job);
       downloads.onJob(payload.job);
       if (name === 'download_completed' && payload.job.root_id) {
         qc.invalidateQueries({ queryKey: keys.entries(payload.job.root_id) });
       }
     });
   }
-  socket.on('download_progress', (p) => downloads.onProgress(p.job_id, p.bytes_done, p.total_bytes ?? null, p.speed));
-  socket.on('download_removed', (p) => qc.setQueryData<DownloadJob[]>(keys.downloads, (old) => (old ?? []).filter((j) => !p.job_ids.includes(j.id))));
+  socket.on('download_progress', (p) => {
+    downloads.onProgress(p.job_id, p.bytes_done, p.total_bytes ?? null, p.speed);
+    markRunning(qc, p.job_id);
+  });
+  socket.on('download_removed', (p) => {
+    forgetJobs(p.job_ids);
+    qc.setQueryData<DownloadJob[]>(keys.downloads, (old) => (old ?? []).filter((j) => !p.job_ids.includes(j.id)));
+  });
   socket.on('library_changed', (p) => {
     qc.invalidateQueries({ queryKey: keys.entries(p.root_id) });
     qc.invalidateQueries({ queryKey: keys.tree(p.root_id) });

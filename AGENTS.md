@@ -348,6 +348,13 @@ says so while it applies.
   straight into a `.part` file. Nothing is spooled to a temporary directory.
 - **socket.io** is mounted at `/ws` (path `/ws/socket.io`); traffic is server to client only. REST
   stays the source of truth: events invalidate or patch the cache, and a reconnect refetches.
+  A job event carries a **snapshot** of the job, never the live object the worker keeps writing
+  to, because the bridge serializes it later on the event loop — aliasing made `download_started`
+  arrive saying `completed`. And a REST answer is only as new as the moment the server received
+  the request: the worker claims a job within a millisecond of `POST /downloads` returning, so
+  `download_started` regularly overtakes the answer. The client stamps each job with the time of
+  the last event and drops an answer to an older request, so a row cannot fall back to "queued"
+  for a whole download. A progress event also promotes a job still cached as queued, once.
 - **Security:** the default host is `127.0.0.1`. The `Host` header is checked against the bound
   host, which blocks DNS rebinding. A state-changing request whose `Origin` names another site, or
   whose `Sec-Fetch-Site` says cross-site, is refused; a request with neither header cannot come
