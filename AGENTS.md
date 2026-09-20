@@ -66,6 +66,14 @@ decisions in a route or a command.
 Every operation exists once, as a core method taking and returning pydantic models, so the API's
 JSON and the CLI's `--json` have the same shape.
 
+**Pydantic compatibility:** the dependency has no version constraint. `core/record.py` supplies
+the project's v2-style model methods and computed-property serialization on native v1 models;
+v2 uses its native implementation. Keep nested events, `can_pause`, persistence exclusions and
+hash validation working on both versions. Pydantic v1 needs Python 3.10–3.13 and FastAPI <0.126;
+the release workflow tests it separately on Python 3.10 and 3.13, including ty. Run the full
+`scripts/dev.py check` and generate the committed API types with v2: v1 has a different JSON
+Schema format and cannot distinguish validation schemas from serialization schemas.
+
 ## 3. Commands
 
 ```bash

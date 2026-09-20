@@ -1,17 +1,21 @@
 """Searchable sources."""
 
+from typing import Any
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from sd_model_hub.api.deps import ServicesDep
 from sd_model_hub.api.errors import ERROR_RESPONSES
+from sd_model_hub.core.record import PYDANTIC_V2
 from sd_model_hub.core.sources.models import IdentifyResult, ModelDetail, ModelFile, SearchPage, SearchQuery, SourceInfo
 
 router = APIRouter(prefix="/v1/sources", tags=["sources"], responses=ERROR_RESPONSES)
+_HASH_CONSTRAINT: dict[str, Any] = {"pattern" if PYDANTIC_V2 else "regex": r"^[0-9a-fA-F]{64}$"}
 
 
 class IdentifyRequest(BaseModel):
-    sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    sha256: str = Field(**_HASH_CONSTRAINT)
 
 
 @router.get("", operation_id="list_sources")

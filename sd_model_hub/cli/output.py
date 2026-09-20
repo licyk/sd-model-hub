@@ -31,7 +31,9 @@ def human_size(size: float | None) -> str:
 
 def to_jsonable(value: Any) -> Any:
     if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
+        if hasattr(value, "model_dump"):
+            return value.model_dump(mode="json")
+        return json.loads(value.json())
     if isinstance(value, (list, tuple)):
         return [to_jsonable(v) for v in value]
     if isinstance(value, dict):

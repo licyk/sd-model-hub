@@ -134,6 +134,52 @@ def test_openapi_has_events(client):
     assert "download_progress" in schema["components"]["schemas"]["ServerEvents"]["properties"]
     assert schema["paths"]["/api/v1/hubs/{hub}/repos/{repo_id}/files"]["get"]["operationId"] == "list_repo_files"
 
+    def check_refs(value):
+        if isinstance(value, dict):
+            if "$ref" in value:
+                assert value["$ref"].startswith("#/components/schemas/")
+                assert value["$ref"].rsplit("/", 1)[1] in schema["components"]["schemas"]
+            for item in value.values():
+                check_refs(item)
+        elif isinstance(value, list):
+            for item in value:
+                check_refs(item)
+
+    check_refs(schema)
+    job_schema = schema["paths"]["/api/v1/downloads/{job_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    job_schema = schema["components"]["schemas"][job_schema["$ref"].rsplit("/", 1)[1]]
+    assert job_schema["properties"]["can_pause"]["readOnly"] is True
+    assert "can_pause" in job_schema["required"]
+
+
+@pytest.mark.parametrize("sha256", ["abc", "g" * 64, "a" * 63, "a" * 65])
+def test_identify_rejects_invalid_hash(client, services, monkeypatch, sha256):
+    def unexpected_call(_hash):
+        pytest.fail("An invalid hash must be rejected before calling a source")
+
+    monkeypatch.setattr(services.sources, "identify", unexpected_call)
+    assert client.post("/api/v1/sources/identify", json={"sha256": sha256}).status_code == 422
+
+
+def test_identify_accepts_valid_hash(client, services, monkeypatch):
+    monkeypatch.setattr(services.sources, "identify", lambda value: [] if value == "aB" * 32 else pytest.fail("Hash changed"))
+    response = client.post("/api/v1/sources/identify", json={"sha256": "aB" * 32})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.parametrize("runner,can_pause", [("http", True), ("huggingface", False)])
+def test_download_response_computed_field(client, services, monkeypatch, runner, can_pause):
+    from datetime import datetime, timezone
+
+    from sd_model_hub.core.downloads.models import DownloadJob
+
+    job = DownloadJob(id=1, runner=runner, title="model", dest_dir="/models", created_at=datetime.now(timezone.utc))
+    monkeypatch.setattr(services.downloads, "get", lambda job_id: job)
+    response = client.get("/api/v1/downloads/1")
+    assert response.status_code == 200, response.text
+    assert response.json()["can_pause"] is can_pause
+
 
 CIVITAI_AUTH = "/api/v1/auth/civitai"
 

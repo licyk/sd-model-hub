@@ -3,9 +3,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import Field, computed_field
+from pydantic import Field
 
-from sd_model_hub.core.record import Record
+from sd_model_hub.core.record import Record, computed_field
 
 JobState = Literal["queued", "running", "paused", "completed", "failed", "cancelled"]
 Runner = Literal["http", "huggingface", "modelscope"]

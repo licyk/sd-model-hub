@@ -29,7 +29,7 @@ dependencies = [
     # back to long polling, which works but is slower and noisier.
     "websockets>=12",
     "python-socketio",
-    "pydantic>=2",
+    "pydantic",
     "httpx",
     "huggingface_hub",
     "modelscope",

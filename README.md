@@ -24,6 +24,16 @@ sd-model-hub --help
 
 Python 3.10 or newer. The web UI is bundled into the package; users do not need Node.
 
+Pydantic v1 and v2 are supported. To keep Pydantic v1 in an existing environment, use
+Python 3.10–3.13 and a compatible FastAPI:
+
+```bash
+python -m pip install sd-model-hub "pydantic<2" "fastapi<0.126"
+```
+
+Python 3.14 and newer require Pydantic v2. Development checks and committed web API types
+are generated with Pydantic v2; the release workflow also tests Pydantic v1 separately.
+
 ## Command line
 
 ```text

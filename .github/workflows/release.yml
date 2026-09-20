@@ -45,6 +45,27 @@ jobs:
       - name: Python types (ty)
         run: python scripts/dev.py typecheck-py --python-version "${{ matrix.python }}" --output-format github --no-progress
 
+  pydantic-v1:
+    name: Pydantic v1 / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pydantic v1 does not support Python 3.14.
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]" "pydantic<2" "fastapi<0.126"
+      - name: Tests
+        run: python -m pytest -q
+      - name: Python types (ty)
+        run: python scripts/dev.py typecheck-py --python-version "${{ matrix.python }}" --output-format github --no-progress
+
   web:
     name: Web UI
     runs-on: ubuntu-latest
@@ -70,7 +91,7 @@ jobs:
 
   build:
     name: Build the wheel
-    needs: [python, web]
+    needs: [python, pydantic-v1, web]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}

@@ -139,7 +139,9 @@ class SettingsService:
         try:
             return Settings.model_validate(data)
         except PydanticValidationError as e:
-            raise ValidationError(f"Invalid settings: {e.errors()[0]['msg']} at {'.'.join(str(p) for p in e.errors()[0]['loc'])}", {"errors": e.errors(include_url=False)}) from e
+            errors = [{key: value for key, value in error.items() if key != "url"} for error in e.errors()]
+            first = e.errors()[0]
+            raise ValidationError(f"Invalid settings: {first['msg']} at {'.'.join(str(p) for p in first['loc'])}", {"errors": errors}) from e
 
     @property
     def settings(self) -> Settings:
