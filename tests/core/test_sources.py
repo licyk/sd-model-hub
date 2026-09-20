@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from sd_model_hub.core.context import build_services
-from sd_model_hub.core.errors import AuthRequiredError, RateLimitedError
+from sd_model_hub.core.errors import AuthRequiredError, RateLimitedError, SourceError
 from sd_model_hub.core.hubs.registry import parse_repo_ref
 from sd_model_hub.core.sources.models import SearchQuery
 from tests.core.test_downloads import CIVITAI_MODEL
@@ -155,6 +155,23 @@ def test_huggingface_search_cursor_and_repo(make):
     assert page.items[0].id == "o/r" and page.next_cursor == "https://huggingface.co/api/models?cursor=xyz"
     repo = s.hubs.get_repo("huggingface", "o/r")
     assert repo.files[0].sha256 == "ff" and repo.description == "# hi" and repo.total_size == 6
+
+
+@pytest.mark.parametrize("record", [{}, {"id": None}, {"id": ""}, {"id": 123}])
+def test_huggingface_rejects_missing_or_invalid_repo_id(make, record):
+    from sd_model_hub.core.hubs.models import HubQuery
+
+    s = make(lambda request: httpx.Response(200, json=[record]))
+    with pytest.raises(SourceError, match="without a valid id"):
+        s.hubs.search("huggingface", HubQuery())
+
+
+def test_huggingface_accepts_model_id_alias(make):
+    from sd_model_hub.core.hubs.models import HubQuery
+
+    s = make(lambda request: httpx.Response(200, json=[{"modelId": "owner/repo"}]))
+    repo = s.hubs.search("huggingface", HubQuery()).items[0]
+    assert (repo.id, repo.author, repo.name) == ("owner/repo", "owner", "repo")
 
 
 def test_modelscope_parsing(make):

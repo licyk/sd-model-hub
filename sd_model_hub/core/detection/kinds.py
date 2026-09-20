@@ -10,6 +10,8 @@ from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from sd_model_hub.core.detection.models import ModelKind
+
 LORA_MARKERS = (".lora_up.", ".lora_down.", ".lora_A.", ".lora_B.", ".hada_w1", ".lokr_w1", ".lora_mid.")
 CONTROLNET_PREFIXES = ("control_model.",)
 CONTROLNET_SEGMENTS = ("input_hint_block.", "controlnet_cond_embedding.")
@@ -56,7 +58,7 @@ VAE_SHARE_THRESHOLD = 0.9
 
 @dataclass(frozen=True)
 class KindResult:
-    kind: str
+    kind: ModelKind
     rule: str
     prefix: str = ""
     confidence: float = 1.0

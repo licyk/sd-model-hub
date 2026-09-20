@@ -176,6 +176,11 @@ def test_py() -> int:
     return python("-m", "pytest")
 
 
+@task("typecheck-py", "Check Python types with ty")
+def typecheck_py(options: list[str] | None = None) -> int:
+    return python("-m", "ty", "check", "--python", sys.executable, *(options or []))
+
+
 # -- Web UI ------------------------------------------------------------------
 
 
@@ -278,9 +283,9 @@ def test_all() -> int:
     return first_failure(test_py(), test_web())
 
 
-@task("check", "Everything CI runs: lint, tests, and the generated types")
+@task("check", "Everything CI runs: lint, Python types, tests, and the generated types")
 def check() -> int:
-    return first_failure(lint(), test_py(), test_web(), typegen_check())
+    return first_failure(lint(), typecheck_py(), test_py(), test_web(), typegen_check())
 
 
 def main(argv: list[str] | None = None) -> int:

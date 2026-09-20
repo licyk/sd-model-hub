@@ -71,7 +71,8 @@ JSON and the CLI's `--json` have the same shape.
 ```bash
 python scripts/dev.py              # list the tasks
 python scripts/dev.py dev          # API + Vite together, hot reload, Ctrl+C stops both
-python scripts/dev.py check        # what CI runs: lint, both test suites, generated types
+python scripts/dev.py check        # what CI runs: lint, ty, both test suites, generated types
+python scripts/dev.py typecheck-py # ty for the Python package (Python 3.10 by default)
 python scripts/dev.py test         # pytest + vitest + vue-tsc
 python scripts/dev.py format       # ruff fixes and formatting
 python scripts/dev.py typegen      # regenerate webui/src/api/schema.d.ts (commit the result)
@@ -82,11 +83,13 @@ There is no Makefile on purpose: this project is developed on Windows as often a
 The web UI uses **bun**. Always finish a change with `python scripts/dev.py check`.
 
 **Releasing** is `.github/workflows/release.yml`, on a push to `main` changing
-`sd_model_hub/version.py`, a `v*` tag, or a manual run: tests on Python 3.10–3.13, the
+`sd_model_hub/version.py`, a `v*` tag, or a manual run: tests and ty checks on Python 3.10–3.14, the
 web tests and type-check, the generated-types check, then any tag is compared with
 `sd_model_hub/version.py`, the wheel is built with the UI inside it and checked (UI present,
-rules present, installs, runs), and only then published to PyPI through a trusted publisher —
-no API token is stored. All triggers publish to PyPI; only tag runs create a GitHub release.
+rules present, installs, runs), and only then published to PyPI by running Twine directly on the
+runner, without Docker. Authentication uses `TWINE_USERNAME=__token__` and the GitHub Actions
+secret `TWINE_PASSWORD` (a PyPI API token); no OIDC permission is needed. Uploads use
+`--skip-existing --non-interactive`. All triggers publish to PyPI; only tag runs create a GitHub release.
 For a version change, bump `VERSION`, commit and push to `main`. Python 3.10 is the floor, so `typing.Self`,
 `tomllib` without the `tomli` fallback and other 3.11+ APIs are out.
 
@@ -94,6 +97,9 @@ For a version change, bump `VERSION`, commit and push to `main`. Python 3.10 is 
 
 - **Python:** ruff with line length 180, indent 4, `E402` ignored (see `pyproject.toml`). Ruff's
   default rule set is kept clean; do not add blanket ignores to silence a finding.
+- **Python types:** ty checks `sd_model_hub`, excluding the generated web UI and its dependencies.
+  It targets Python 3.10 locally; CI overrides the target for each Python matrix entry.
+  `typecheck-py` passes its own interpreter with `--python` so dependencies resolve consistently.
 - **Comments explain why, never what.** Do not narrate the diff or leave "changed X" notes.
 - **Docstrings** on modules and non-obvious functions; one line where one line does.
 - **Use the file tools to edit code.** A scripted mass rewrite (sed and friends) needs the user's
@@ -452,7 +458,7 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - Drag-and-drop upload is covered at the API level, not by dropping a file in a real browser.
 - The Windows credential store, and the app on Windows generally, is untested.
 - **Before the first release:** the project has no LICENSE file and no `license` or `urls`
-  metadata, and PyPI needs a trusted publisher plus the `pypi` environment. The
+  metadata, and publishing needs the `TWINE_PASSWORD` secret plus the `pypi` environment. The
   name `sd-model-hub` was free on PyPI when last checked.
 - "Select similar models" from the original plan is implemented as filters for kind and base
   model; nobody has confirmed that is what was meant.

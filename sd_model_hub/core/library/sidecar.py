@@ -56,7 +56,9 @@ def read_civitai_info(directory: Path, stem: str) -> dict[str, Any] | None:
     data = _read_json(directory / f"{stem}.civitai.info")
     if data is None:
         return None
-    model = data.get("model") if isinstance(data.get("model"), dict) else {}
+    model = data.get("model")
+    if not isinstance(model, dict):
+        model = {}
     return {
         "model_id": data.get("modelId"),
         "version_id": data.get("id"),

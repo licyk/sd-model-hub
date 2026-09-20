@@ -2,14 +2,17 @@
 
 import subprocess
 import threading
+from typing import Literal
+
+StopReason = Literal["paused", "cancelled"]
 
 
 class JobStopped(Exception):
     """Raised inside a runner when the job was paused or cancelled."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: StopReason) -> None:
         super().__init__(reason)
-        self.reason = reason  # "paused" or "cancelled"
+        self.reason = reason
 
 
 class TransientError(Exception):
@@ -22,11 +25,11 @@ class TransientError(Exception):
 
 class JobControl:
     def __init__(self) -> None:
-        self.stop_reason: str | None = None
+        self.stop_reason: StopReason | None = None
         self.event = threading.Event()
         self.process: subprocess.Popen[bytes] | None = None
 
-    def request(self, reason: str) -> None:
+    def request(self, reason: StopReason) -> None:
         if self.stop_reason is None:
             self.stop_reason = reason
         self.event.set()

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from sd_model_hub.core.errors import SourceError
 from sd_model_hub.core.hubs.base import HubAdapter
 from sd_model_hub.core.hubs.models import HubPage, HubQuery, RepoDetail, RepoFile, RepoSummary
 
@@ -17,6 +18,8 @@ class HuggingFaceAdapter(HubAdapter):
 
     def _summary(self, m: dict[str, Any]) -> RepoSummary:
         repo_id = m.get("id") or m.get("modelId")
+        if not isinstance(repo_id, str) or not repo_id:
+            raise SourceError("Hugging Face returned a repository without a valid id")
         return RepoSummary(
             hub=self.id,
             id=repo_id,

@@ -36,7 +36,7 @@ def root_add(
     from sd_model_hub.core.library.models import RootCreate
 
     with open_services() as s:
-        root = s.library.add_root(RootCreate(name=name, path=str(path), layout=layout))  # type: ignore[arg-type]
+        root = s.library.add_root(RootCreate.model_validate({"name": name, "path": str(path), "layout": layout}))
     if json_output:
         print_json(root)
     else:

@@ -8,11 +8,13 @@ from fastapi.openapi.utils import get_openapi
 from sd_model_hub.core.events.models import EventBase
 
 
-def install_openapi(app: FastAPI) -> None:
-    def custom_openapi() -> dict[str, Any]:
-        if app.openapi_schema:
-            return app.openapi_schema
-        schema = get_openapi(title=app.title, version=app.version, routes=app.routes, description=app.description)
+class ModelHubAPI(FastAPI):
+    """FastAPI with socket event models included in its OpenAPI schema."""
+
+    def openapi(self) -> dict[str, Any]:
+        if self.openapi_schema:
+            return self.openapi_schema
+        schema = get_openapi(title=self.title, version=self.version, routes=self.routes, description=self.description)
         components = schema.setdefault("components", {}).setdefault("schemas", {})
         events: dict[str, dict[str, str]] = {}
         for event_cls in EventBase.get_events():
@@ -23,7 +25,5 @@ def install_openapi(app: FastAPI) -> None:
             events[event_cls.__event_name__] = {"$ref": f"#/components/schemas/{event_cls.__name__}"}
         components["ServerEvents"] = {"type": "object", "properties": events, "required": sorted(events)}
         schema["components"]["schemas"] = dict(sorted(components.items()))
-        app.openapi_schema = schema
+        self.openapi_schema = schema
         return schema
-
-    app.openapi = custom_openapi  # type: ignore[method-assign]

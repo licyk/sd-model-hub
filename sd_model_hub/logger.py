@@ -15,10 +15,10 @@ def setup_logging(level: int | str | None = None) -> logging.Logger:
     if level is None:
         level = os.environ.get("SD_MODEL_HUB_LOG_LEVEL", "INFO").upper()
     logger.setLevel(level)
-    if not any(getattr(h, "_sd_model_hub", False) for h in logger.handlers):
+    if not any(h.name == LOGGER_NAME for h in logger.handlers):
         handler = RichHandler(console=Console(stderr=True), show_time=False, show_path=False, markup=False, rich_tracebacks=False)
         handler.setFormatter(logging.Formatter("%(message)s"))
-        handler._sd_model_hub = True  # type: ignore[attr-defined]
+        handler.name = LOGGER_NAME
         logger.addHandler(handler)
         logger.propagate = False
     return logger

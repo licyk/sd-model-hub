@@ -107,3 +107,25 @@ def test_path_outside_roots_is_not_found(runner, tmp_path):
 
     result = runner.invoke(get_app(), ["library", "info", str(tmp_path)])
     assert isinstance(result.exception, NotFoundError) and result.exception.exit_code == 2
+
+
+def test_invalid_root_layout_is_validated(runner, tmp_path):
+    from pydantic import ValidationError
+
+    result = runner.invoke(get_app(), ["library", "root", "add", str(tmp_path), "--layout", "invalid"])
+    assert isinstance(result.exception, ValidationError)
+    assert result.exception.errors()[0]["loc"] == ("layout",)
+
+
+def test_logging_setup_does_not_duplicate_handlers(monkeypatch):
+    from sd_model_hub.logger import setup_logging
+
+    logger = logging.getLogger(LOGGER_NAME)
+    monkeypatch.setattr(logger, "handlers", [])
+    monkeypatch.setattr(logger, "level", logging.NOTSET)
+    monkeypatch.setattr(logger, "propagate", True)
+    setup_logging("INFO")
+    setup_logging("DEBUG")
+    assert len(logger.handlers) == 1
+    assert logger.handlers[0].name == LOGGER_NAME
+    assert logger.level == logging.DEBUG

@@ -1,7 +1,7 @@
 """download model | url | hf | modelscope, run in the foreground with a progress bar."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn, TimeRemainingColumn, TransferSpeedColumn
@@ -105,7 +105,7 @@ def download_url(
 
 
 def _hub(
-    hub: str,
+    hub: Literal["huggingface", "modelscope"],
     repo_id: str,
     revision: str | None,
     include: list[str] | None,
@@ -125,7 +125,7 @@ def _hub(
         if dest is None and root is None and rel is None:
             dest = str((Path.cwd() / repo.split("/")[-1]).resolve())
         req = DownloadCreate(
-            hub=HubSelection(hub=hub, repo_id=repo, revision=revision or parsed_rev, include=include or [], exclude=exclude or []),  # type: ignore[arg-type]
+            hub=HubSelection(hub=hub, repo_id=repo, revision=revision or parsed_rev, include=include or [], exclude=exclude or []),
             dest_dir=dest,
             root_id=root,
             rel_dir=rel,

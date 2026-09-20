@@ -116,7 +116,7 @@ class DetectionService:
         match = self.rules.match(kind.kind, tensors, kind.prefix)
         if match is not None:
             return DetectionResult(
-                kind=kind.kind,  # type: ignore[arg-type]
+                kind=kind.kind,
                 base_model=match.rule.base_model,
                 prediction_type=match.prediction_type,
                 confidence=round(min(kind.confidence, match.rule.confidence), 3),
@@ -128,7 +128,7 @@ class DetectionService:
         if base is None and header.format == "gguf":
             base = _GGUF_ARCH.get(str(header.metadata.get("general.architecture", "")).lower())
         return DetectionResult(
-            kind=kind.kind,  # type: ignore[arg-type]
+            kind=kind.kind,
             base_model=base,
             confidence=round(kind.confidence * (0.6 if base else 1.0), 3),
             rule_id="metadata" if base else None,

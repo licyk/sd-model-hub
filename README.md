@@ -180,7 +180,8 @@ and a folder reached twice through a loop of links is walked once.
 pip install -e ".[dev]"
 python scripts/dev.py              # list the developer tasks
 python scripts/dev.py dev          # API server and web UI together, with hot reload
-python scripts/dev.py check        # what CI runs: lint, tests, generated types
+python scripts/dev.py check        # what CI runs: lint, ty, tests, generated types
+python scripts/dev.py typecheck-py # Python types; targets Python 3.10 by default
 python scripts/dev.py test         # pytest, vitest and vue-tsc
 python scripts/dev.py format       # ruff fixes and formatting
 python scripts/dev.py typegen      # regenerate src/api/schema.d.ts from the OpenAPI schema
@@ -240,12 +241,16 @@ python scripts/dev.py check                 # first, locally
 git push origin main
 ```
 
-The workflow runs the tests on Python 3.10 to 3.13, the web UI tests and type-check, and the
+The workflow runs the tests and ty checks on Python 3.10 to 3.14, the web UI tests and type-check, and the
 generated-types check; for tag runs it verifies that the tag matches `sd_model_hub/version.py`, then builds
 the wheel **with the web UI in it**, checks the wheel really contains the UI and the detection
 rules, installs it into a clean environment and runs `sd-model-hub version`. Only then does it
 publish. Tag runs also create the GitHub release with the built files attached.
 
-Set-up, once: on PyPI add a *trusted publisher* for this repository with workflow
-`release.yml` and environment `pypi`, then create that environment in the repository settings.
-No API token is stored anywhere; the environment can also require an approval before a release goes out.
+Publishing runs `python -m twine upload` directly on the runner, without a Docker action.
+Existing files are skipped so retrying a release does not upload them again.
+
+Set-up, once: create a PyPI API token and save it as the GitHub Actions secret `TWINE_PASSWORD`
+in this repository or its `pypi` environment. Create that environment in the repository settings;
+it can also require an approval before a release goes out. The workflow uses `__token__` as the
+username and does not require a trusted publisher.

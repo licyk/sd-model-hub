@@ -10,7 +10,7 @@ import json
 import os
 import sys
 import traceback
-from typing import Any
+from typing import Any, TypedDict
 
 # Run as a script, this file's folder is sys.path[0], where hubs/modelscope.py would shadow the
 # real modelscope package. Drop it before any library import.
@@ -41,17 +41,28 @@ def download_huggingface(cfg: dict[str, Any]) -> None:
         emit({"event": "file_done", "path": path})
 
 
+class _ModelScopeOptions(TypedDict, total=False):
+    revision: str
+    token: str
+    endpoint: str
+
+
 def download_modelscope(cfg: dict[str, Any]) -> None:
     from modelscope.hub.file_download import model_file_download
 
+    # Omitted options retain the library's defaults, whose annotations do not accept None.
+    options: _ModelScopeOptions = {}
+    if (revision := cfg.get("revision")) is not None:
+        options["revision"] = revision
+    for key in ("token", "endpoint"):
+        if value := cfg.get(key):
+            options[key] = value
     for path in cfg["files"]:
         model_file_download(
             cfg["repo_id"],
             path,
-            revision=cfg.get("revision"),
             local_dir=cfg["local_dir"],
-            token=cfg.get("token") or None,
-            endpoint=cfg.get("endpoint") or None,
+            **options,
         )
         emit({"event": "file_done", "path": path})
 

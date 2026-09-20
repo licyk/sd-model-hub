@@ -15,7 +15,7 @@ from sd_model_hub.core.detection import DetectionService
 from sd_model_hub.core.downloads.http_downloader import HttpState, http_download, sanitize_file_name, wait_backoff
 from sd_model_hub.core.downloads.hub_runner import cleanup_incomplete, run_hub_download
 from sd_model_hub.core.downloads.job import JobControl, JobStopped, TransientError
-from sd_model_hub.core.downloads.models import FINISHED_STATES, DownloadCreate, DownloadJob
+from sd_model_hub.core.downloads.models import FINISHED_STATES, DownloadCreate, DownloadJob, JobState
 from sd_model_hub.core.errors import AuthRequiredError, ConflictError, InvalidPathError, ModelHubError, NotFoundError, ValidationError
 from sd_model_hub.core.events import EventBus
 from sd_model_hub.core.events.models import (
@@ -290,8 +290,8 @@ class DownloadManager:
 
     # -- control --------------------------------------------------------------
 
-    def _transition(self, job: DownloadJob, state: str, error: str | None = None) -> DownloadJob:
-        job.state = state  # type: ignore[assignment]
+    def _transition(self, job: DownloadJob, state: JobState, error: str | None = None) -> DownloadJob:
+        job.state = state
         if state in FINISHED_STATES:
             job.finished_at = _now()
             job.speed = 0.0

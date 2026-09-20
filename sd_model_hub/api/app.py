@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from sd_model_hub.api.errors import install_error_handlers
-from sd_model_hub.api.openapi import install_openapi
+from sd_model_hub.api.openapi import ModelHubAPI
 from sd_model_hub.api.routers import app_info, auth, downloads, hubs, library, settings, sources
 from sd_model_hub.api.security import SecurityMiddleware
 from sd_model_hub.api.sockets import SocketBridge
@@ -55,7 +55,7 @@ def create_app(
             services.downloads.shutdown()
             await socket_bridge.stop()
 
-    app = FastAPI(title="SD Model Hub", version=VERSION, lifespan=lifespan, docs_url=f"{prefix}/docs", redoc_url=None, openapi_url=f"{prefix}/openapi.json")
+    app = ModelHubAPI(title="SD Model Hub", version=VERSION, lifespan=lifespan, docs_url=f"{prefix}/docs", redoc_url=None, openapi_url=f"{prefix}/openapi.json")
     app.state.services = services
     app.state.bound_port = bound_port
     app.state.api_prefix = prefix
@@ -64,7 +64,6 @@ def create_app(
     for module in (app_info, settings, auth, sources, hubs, downloads, library):
         app.include_router(module.router, prefix=f"{prefix}/api")
     app.mount(f"{prefix}/ws", socket_bridge.asgi_app(prefix), name="socket")
-    install_openapi(app)
 
     origins = services.settings.settings.server.allowed_origins
     if origins:
