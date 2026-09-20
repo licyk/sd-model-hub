@@ -1,0 +1,611 @@
+"""The local library: roots, browsing and file operations."""
+
+import logging
+import os
+import threading
+import time
+import uuid
+from collections.abc import Iterator
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, BinaryIO, Literal
+
+from sd_model_hub.core.detection import DetectionService
+from sd_model_hub.core.detection.models import DETECTABLE_KINDS, kinds_compatible
+from sd_model_hub.core.errors import ConflictError, InvalidPathError, ModelHubError, NotFoundError, ValidationError
+from sd_model_hub.core.events import EventBus
+from sd_model_hub.core.events.models import ImportProgressEvent, LibraryChangedEvent
+from sd_model_hub.core.library import sidecar
+from sd_model_hub.core.library.fsops import copy_path, move_path, remove_path, rename_no_overwrite
+from sd_model_hub.core.library.layouts import LAYOUTS, default_folder, folder_kind
+from sd_model_hub.core.library.models import (
+    DeleteRequest,
+    FolderCreate,
+    FolderEntry,
+    FolderListing,
+    ImportRequest,
+    ModelEntry,
+    ModelInfo,
+    MoveRequest,
+    OperationResult,
+    PathRef,
+    RenameRequest,
+    RootCreate,
+    RootInfo,
+    RootUpdate,
+    TreeNode,
+)
+from sd_model_hub.core.library.previews import ScannedModel, companions_of, find_preview, is_ignored, model_stem, scan_dir
+from sd_model_hub.core.library.safety import escapes_root, resolve_in_root, to_rel, unique_path, validate_name
+from sd_model_hub.core.settings import ModelRoot, SettingsService
+
+logger = logging.getLogger(__name__)
+
+DetectMode = Literal["full", "cached", "none"]
+
+
+class UploadWriter:
+    """Streams an upload into ``<name>.part`` beside the target, then renames it into place."""
+
+    def __init__(self, service: "LibraryService", root_id: str, target: Path, total: int | None) -> None:
+        self._service = service
+        self.root_id = root_id
+        self.target = target
+        self.part = target.with_name(target.name + ".part")
+        self.total = total
+        self.written = 0
+        self._last_event = 0.0
+        try:
+            # Held open across write() calls and closed in commit() or abort().
+            self._file: BinaryIO = open(self.part, "xb")  # noqa: SIM115
+        except FileExistsError:
+            raise ConflictError(f"An upload of {target.name} is already in progress") from None
+
+    def write(self, chunk: bytes) -> None:
+        self._file.write(chunk)
+        self.written += len(chunk)
+        now = time.monotonic()
+        if now - self._last_event >= 0.25:
+            self._last_event = now
+            self._publish(done=False)
+
+    def _publish(self, done: bool) -> None:
+        root_path = self._service.root_path(self.root_id)
+        self._service.events.publish(ImportProgressEvent(root_id=self.root_id, rel_path=to_rel(root_path, self.target), bytes_done=self.written, total_bytes=self.total, done=done))
+
+    def commit(self) -> PathRef:
+        self._file.close()
+        if self.total is not None and self.written != self.total:
+            self.abort()
+            raise ValidationError(f"Upload incomplete: received {self.written} of {self.total} bytes")
+        try:
+            rename_no_overwrite(self.part, self.target)
+        except BaseException:
+            self.abort()
+            raise
+        self._publish(done=True)
+        root_path = self._service.root_path(self.root_id)
+        self._service.notify_changed(self.root_id, to_rel(root_path, self.target.parent))
+        return PathRef(root_id=self.root_id, path=to_rel(root_path, self.target))
+
+    def abort(self) -> None:
+        if not self._file.closed:
+            self._file.close()
+        try:
+            self.part.unlink()
+        except FileNotFoundError:
+            pass
+
+
+class LibraryService:
+    def __init__(self, settings: SettingsService, detection: DetectionService, events: EventBus, roots_locked: bool = False) -> None:
+        """``roots_locked`` is for a host application that supplies the model folders itself:
+        they cannot then be added, changed or removed, and the interface hides those actions."""
+        self.settings = settings
+        self.detection = detection
+        self.events = events
+        self.roots_locked = roots_locked
+        self._scan_lock = threading.Lock()
+        self._scanning: set[tuple[str, str]] = set()
+
+    # -- roots --------------------------------------------------------------
+
+    def _roots(self) -> list[ModelRoot]:
+        return list(self.settings.settings.paths.model_roots)
+
+    def _root(self, root_id: str) -> ModelRoot:
+        for root in self._roots():
+            if root.id == root_id:
+                return root
+        raise NotFoundError(f"No model root with id {root_id!r}")
+
+    def root_path(self, root_id: str) -> Path:
+        return Path(self._root(root_id).path).expanduser().resolve()
+
+    @staticmethod
+    def _info(root: ModelRoot) -> RootInfo:
+        return RootInfo(id=root.id, name=root.name, path=root.path, layout=root.layout, exists=Path(root.path).expanduser().is_dir())
+
+    def list_roots(self) -> list[RootInfo]:
+        return [self._info(r) for r in self._roots()]
+
+    def get_root(self, root_id: str) -> RootInfo:
+        return self._info(self._root(root_id))
+
+    def _check_roots_unlocked(self) -> None:
+        if self.roots_locked:
+            raise ConflictError("The model folders are fixed by the application that started SD Model Hub and cannot be changed here.")
+
+    def add_root(self, req: RootCreate) -> RootInfo:
+        self._check_roots_unlocked()
+        path = Path(req.path).expanduser()
+        if not path.is_absolute():
+            raise InvalidPathError("A root path must be absolute")
+        path = path.resolve()
+        if not path.is_dir():
+            raise NotFoundError(f"Not a directory: {path}")
+        for existing in self._roots():
+            if Path(existing.path).expanduser().resolve() == path:
+                raise ConflictError(f"Already a root: {path}", {"root_id": existing.id})
+        root = ModelRoot(id=uuid.uuid4().hex[:8], name=req.name or path.name or str(path), path=str(path), layout=req.layout)
+
+        def add(data: dict[str, Any]) -> None:
+            data["paths"]["model_roots"].append(root.model_dump())
+
+        self.settings.mutate(add)
+        return self._info(root)
+
+    def update_root(self, root_id: str, req: RootUpdate) -> RootInfo:
+        self._check_roots_unlocked()
+        self._root(root_id)
+        changes = req.model_dump(exclude_none=True)
+        if "path" in changes:
+            path = Path(changes["path"]).expanduser()
+            if not path.is_absolute() or not path.is_dir():
+                raise InvalidPathError(f"Not an absolute directory: {path}")
+            changes["path"] = str(path.resolve())
+
+        def update(data: dict[str, Any]) -> None:
+            for r in data["paths"]["model_roots"]:
+                if r["id"] == root_id:
+                    r.update(changes)
+
+        self.settings.mutate(update)
+        return self.get_root(root_id)
+
+    def remove_root(self, root_id: str) -> None:
+        """Forget a root. Files on disk are untouched."""
+        self._check_roots_unlocked()
+        self._root(root_id)
+
+        def remove(data: dict[str, Any]) -> None:
+            data["paths"]["model_roots"] = [r for r in data["paths"]["model_roots"] if r["id"] != root_id]
+
+        self.settings.mutate(remove)
+
+    def locate(self, path: Path) -> tuple[str, str]:
+        """Find the root that contains an absolute path. Returns ``(root_id, rel_path)``.
+
+        The path as written is tried first, so a path that runs through a symlinked folder inside
+        a root is found there rather than where it really lives.
+        """
+        given = Path(os.path.abspath(path.expanduser()))
+        candidates = [given, given.resolve()] if self._follow_symlinks() else [given.resolve()]
+        for target in candidates:
+            best: tuple[str, Path] | None = None
+            for root in self._roots():
+                root_path = Path(root.path).expanduser()
+                root_path = root_path if target is given else root_path.resolve()
+                if (target == root_path or root_path in target.parents) and (best is None or len(str(root_path)) > len(str(best[1]))):
+                    best = (root.id, root_path)
+            if best is not None:
+                return best[0], to_rel(best[1], target)
+        for root in self._roots():
+            root_path = Path(root.path).expanduser()
+            if root_path in given.parents:
+                raise InvalidPathError(f"{given} is reached through a symbolic link that leaves its root. Turn on library.follow_symlinks to open it.")
+        raise NotFoundError(f"{given} is not inside any model root")
+
+    def default_dest(self, root_id: str, kind: str | None) -> str:
+        """The relative folder where a model of ``kind`` goes in this root."""
+        root = self._root(root_id)
+        configured = self.settings.settings.downloads.kind_folders.get(kind or "")
+        if configured:
+            return configured
+        return default_folder(root.layout, self.root_path(root_id), kind or "") if kind else ""
+
+    def notify_changed(self, root_id: str, rel_path: str) -> None:
+        self.events.publish(LibraryChangedEvent(root_id=root_id, rel_path=rel_path))
+
+    # -- browsing -----------------------------------------------------------
+
+    def _follow_symlinks(self) -> bool:
+        return self.settings.settings.library.follow_symlinks
+
+    def _resolve(self, root_id: str, rel_path: str, must_exist: bool = True) -> tuple[ModelRoot, Path, Path]:
+        root = self._root(root_id)
+        root_path = self.root_path(root_id)
+        if not root_path.is_dir():
+            raise NotFoundError(f"Root folder is missing: {root_path}")
+        target = resolve_in_root(root_path, rel_path, follow_symlinks=self._follow_symlinks())
+        if must_exist and not target.exists():
+            raise NotFoundError(f"Not found: {rel_path}")
+        return root, root_path, target
+
+    def _entry(self, root: ModelRoot, root_path: Path, scanned: ScannedModel, detect: DetectMode) -> tuple[ModelEntry, bool]:
+        """Build one model entry. The flag says whether detection is still pending."""
+        path = scanned.path
+        st = path.stat()
+        size = st.st_size if not scanned.is_dir else sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+        rel = to_rel(root_path, path)
+        fkind = folder_kind(root.layout, to_rel(root_path, path.parent))
+        detection = None
+        pending = False
+        if detect == "full":
+            detection = self.detection.detect(path)[0]
+        elif detect == "cached":
+            hit = self.detection.cached(path)
+            if hit is not None:
+                detection = hit[0]
+            else:
+                pending = True
+        hint = sidecar.sidecar_hint(path.parent, scanned.stem)
+        mismatch = False
+        if detection is not None and detection.kind != "unknown":
+            for other in (hint.kind if hint else None, fkind):
+                if other in DETECTABLE_KINDS and not kinds_compatible(detection.kind, other):
+                    mismatch = True
+            if hint and hint.base_model and detection.base_model and hint.base_model != detection.base_model:
+                mismatch = True
+        entry = ModelEntry(
+            name=path.name,
+            stem=scanned.stem,
+            path=rel,
+            is_dir=scanned.is_dir,
+            size=size,
+            mtime=datetime.fromtimestamp(st.st_mtime, tz=timezone.utc),
+            preview=to_rel(root_path, scanned.preview) if scanned.preview else None,
+            folder_kind=fkind,
+            detection=detection,
+            sidecar=hint,
+            mismatch=mismatch,
+            companions=[p.name for p in scanned.companions],
+        )
+        return entry, pending
+
+    def list_entries(self, root_id: str, rel_path: str = "", detect: DetectMode = "full", kind: str | None = None) -> FolderListing:
+        root, root_path, target = self._resolve(root_id, rel_path)
+        if not target.is_dir():
+            raise InvalidPathError(f"Not a folder: {rel_path}")
+        lib = self.settings.settings.library
+        scanned = scan_dir(target, lib.model_extensions, lib.preview_extensions)
+        models: list[ModelEntry] = []
+        pending = 0
+        for s in scanned.models:
+            try:
+                entry, is_pending = self._entry(root, root_path, s, detect)
+            except OSError:
+                continue
+            pending += is_pending
+            if kind and not self._kind_matches(entry, kind):
+                continue
+            models.append(entry)
+        folders = [
+            FolderEntry(name=p.name, path=to_rel(root_path, p), folder_kind=folder_kind(root.layout, to_rel(root_path, p)))
+            for p in scanned.folders
+            if self._folder_allowed(root_path, p)
+        ]
+        rel = to_rel(root_path, target)
+        if pending and detect == "cached":
+            self.scan_in_background(root_id, rel)
+        return FolderListing(root_id=root_id, path=rel, folder_kind=folder_kind(root.layout, rel), folders=folders, models=models, pending_detection=pending)
+
+    def _folder_allowed(self, root_path: Path, folder: Path) -> bool:
+        """Hide a symlinked folder that leaves the root while symlinks are not followed.
+
+        It could not be opened anyway, so listing it would only produce an error on the way in.
+        """
+        if self._follow_symlinks() or not folder.is_symlink():
+            return True
+        return not escapes_root(root_path, folder)
+
+    @staticmethod
+    def _kind_matches(entry: ModelEntry, kind: str) -> bool:
+        detected = entry.detection.kind if entry.detection else None
+        if detected and detected != "unknown":
+            return detected == kind
+        return (entry.sidecar.kind if entry.sidecar else None) == kind or entry.folder_kind == kind or (kind == "unknown" and not entry.folder_kind)
+
+    @staticmethod
+    def _dir_id(path: Path) -> tuple[int, int] | None:
+        """Identity of the real directory, so a symlink loop is walked only once."""
+        try:
+            st = path.stat()
+        except OSError:
+            return None
+        return (st.st_dev, st.st_ino)
+
+    def walk_models(self, root_id: str, rel_path: str = "", detect: DetectMode = "full", kind: str | None = None) -> Iterator[ModelEntry]:
+        """Every model below a folder, depth first. A folder reached twice is walked once."""
+        _, root_path, _ = self._resolve(root_id, rel_path)
+        stack = [rel_path]
+        seen: set[tuple[int, int]] = set()
+        while stack:
+            current = stack.pop()
+            key = self._dir_id(resolve_in_root(root_path, current, follow_symlinks=self._follow_symlinks()))
+            if key is not None:
+                if key in seen:
+                    continue
+                seen.add(key)
+            listing = self.list_entries(root_id, current, detect=detect, kind=kind)
+            yield from listing.models
+            stack.extend(reversed([f.path for f in listing.folders]))
+
+    def tree(self, root_id: str, max_depth: int = 16) -> TreeNode:
+        root, root_path, _ = self._resolve(root_id, "")
+        seen: set[tuple[int, int]] = set()
+
+        def build(path: Path, depth: int) -> TreeNode:
+            rel = to_rel(root_path, path)
+            node = TreeNode(name=path.name if rel else root.name, path=rel, folder_kind=folder_kind(root.layout, rel))
+            key = self._dir_id(path)
+            if depth >= max_depth or (key is not None and key in seen):
+                return node
+            if key is not None:
+                seen.add(key)
+            try:
+                with os.scandir(path) as it:
+                    subdirs = sorted((Path(e.path) for e in it if e.is_dir() and not is_ignored(e.name)), key=lambda p: p.name.lower())
+            except OSError:
+                return node
+            for sub in subdirs:
+                if (sub / "model_index.json").is_file() or not self._folder_allowed(root_path, sub):
+                    continue
+                node.children.append(build(sub, depth + 1))
+            return node
+
+        return build(root_path, 0)
+
+    def model_info(self, root_id: str, rel_path: str, compute_hash: bool = False) -> ModelInfo:
+        root, root_path, target = self._resolve(root_id, rel_path)
+        is_dir = target.is_dir()
+        if is_dir and not (target / "model_index.json").is_file():
+            raise InvalidPathError(f"Not a model: {rel_path}")
+        lib = self.settings.settings.library
+        stem = model_stem(target, is_dir)
+        scanned = ScannedModel(target, is_dir, stem, companions=companions_of(target, lib.model_extensions))
+        preview = find_preview(stem, {c.name for c in scanned.companions}, lib.preview_extensions)
+        scanned.preview = target.parent / preview if preview else None
+        entry, _ = self._entry(root, root_path, scanned, "full")
+        _, metadata = self.detection.detect(target)
+        sha = None
+        if compute_hash and not is_dir:
+            sha = self.detection.sha256(target)
+        elif not is_dir:
+            hit = self.detection.cached(target)
+            sha = hit[2] if hit else None
+        return ModelInfo(
+            root_id=root_id,
+            entry=entry,
+            sha256=sha,
+            header_metadata=metadata,
+            sdmodelhub=sidecar.read_sdmodelhub(target.parent, stem),
+            webui=sidecar.read_webui(target.parent, stem),
+            description=sidecar.read_description(target.parent, stem),
+            civitai_info=sidecar.read_civitai_info(target.parent, stem),
+        )
+
+    def preview_file(self, root_id: str, rel_path: str) -> Path:
+        """Resolve a preview image path; it must be an image file inside the root."""
+        _, _, target = self._resolve(root_id, rel_path)
+        if not target.is_file() or target.suffix.lower() not in self.settings.settings.library.preview_extensions:
+            raise NotFoundError(f"Not a preview image: {rel_path}")
+        return target
+
+    # -- detection scans ----------------------------------------------------
+
+    def scan(self, root_id: str, rel_path: str = "", recursive: bool = True) -> int:
+        """Detect every model below a folder, filling the cache. Returns the number of models."""
+        count = 0
+        if recursive:
+            for _ in self.walk_models(root_id, rel_path, detect="full"):
+                count += 1
+        else:
+            count = len(self.list_entries(root_id, rel_path, detect="full").models)
+        self.notify_changed(root_id, rel_path)
+        return count
+
+    def scan_in_background(self, root_id: str, rel_path: str = "", recursive: bool = False) -> bool:
+        key = (root_id, rel_path)
+        with self._scan_lock:
+            if key in self._scanning:
+                return False
+            self._scanning.add(key)
+
+        def run() -> None:
+            try:
+                self.scan(root_id, rel_path, recursive=recursive)
+            except ModelHubError as e:
+                logger.warning("Scan of %s:%s failed: %s", root_id, rel_path, e)
+            except Exception:
+                logger.exception("Scan of %s:%s failed", root_id, rel_path)
+            finally:
+                with self._scan_lock:
+                    self._scanning.discard(key)
+
+        threading.Thread(target=run, name=f"scan-{root_id}", daemon=True).start()
+        return True
+
+    # -- operations ---------------------------------------------------------
+
+    def _is_model(self, path: Path) -> bool:
+        if path.is_dir():
+            return (path / "model_index.json").is_file()
+        return path.suffix.lower() in {e.lower() for e in self.settings.settings.library.model_extensions}
+
+    def _group(self, path: Path) -> list[Path]:
+        """A path plus its companions when it is a model."""
+        if self._is_model(path):
+            return [path, *companions_of(path, self.settings.settings.library.model_extensions)]
+        return [path]
+
+    @staticmethod
+    def _renamed(member: Path, old_stem: str, new_stem: str, dest_dir: Path) -> Path:
+        name = member.name
+        return dest_dir / (new_stem + name[len(old_stem) :] if name.startswith(old_stem) else name)
+
+    def _plan_group(self, src: Path, dest_dir: Path, on_conflict: str, new_stem: str | None = None) -> list[tuple[Path, Path]]:
+        """Pair each file of a model group with its target, applying a suffix on conflict if asked."""
+        group = self._group(src)
+        old_stem = model_stem(src, src.is_dir()) if self._is_model(src) else src.name
+        stem = new_stem or old_stem
+        for attempt in range(10_000):
+            candidate = stem if attempt == 0 else f"{stem}_{attempt}"
+            pairs = [(m, self._renamed(m, old_stem, candidate, dest_dir)) for m in group]
+            clashes = [d for s, d in pairs if (d.exists() or d.is_symlink()) and d != s]
+            if not clashes:
+                return pairs
+            if on_conflict != "rename":
+                raise ConflictError(f"Target exists: {clashes[0].name}", {"targets": [str(c) for c in clashes]})
+        raise ConflictError("Could not find a free name")
+
+    def import_paths(self, req: ImportRequest) -> OperationResult:
+        _, root_path, dest_dir = self._resolve(req.root_id, req.rel_dir, must_exist=False)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        result = OperationResult()
+        for raw in req.sources:
+            src = Path(raw).expanduser()
+            if not src.is_absolute():
+                raise InvalidPathError(f"Source must be an absolute path: {raw}")
+            if not src.exists():
+                raise NotFoundError(f"Not found: {raw}")
+            src = src.resolve()
+            if src == dest_dir or src in dest_dir.parents:
+                raise InvalidPathError("Cannot import a folder into itself")
+            for s, d in self._plan_group(src, dest_dir, req.on_conflict):
+                if req.move:
+                    move_path(s, d)
+                    self.detection.forget(s)
+                else:
+                    copy_path(s, d)
+                if s == src:
+                    result.paths.append(PathRef(root_id=req.root_id, path=to_rel(root_path, d)))
+        self.notify_changed(req.root_id, to_rel(root_path, dest_dir))
+        return result
+
+    def open_upload(self, root_id: str, rel_dir: str, name: str, total: int | None = None, on_conflict: str = "error") -> UploadWriter:
+        """Start a streamed upload. The name may contain ``/`` to keep a dropped folder's structure."""
+        parts = [p for p in name.replace("\\", "/").split("/") if p]
+        if not parts:
+            raise InvalidPathError("Empty file name")
+        for p in parts:
+            validate_name(p)
+        _, root_path, dest_dir = self._resolve(root_id, "/".join([rel_dir, *parts[:-1]]) if rel_dir else "/".join(parts[:-1]), must_exist=False)
+        target = dest_dir / parts[-1]
+        if target.exists():
+            if on_conflict != "rename":
+                raise ConflictError(f"Target exists: {parts[-1]}", {"target": to_rel(root_path, target)})
+            target = unique_path(target)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        return UploadWriter(self, root_id, target, total)
+
+    def move(self, req: MoveRequest) -> OperationResult:
+        _, dest_root, dest_dir = self._resolve(req.dest_root_id, req.dest_dir, must_exist=False)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        result = OperationResult()
+        changed: set[tuple[str, str]] = {(req.dest_root_id, to_rel(dest_root, dest_dir))}
+        for item in req.items:
+            _, src_root, src = self._resolve(item.root_id, item.path)
+            if src == src_root:
+                raise InvalidPathError("Cannot move a root")
+            if src.is_dir() and (dest_dir == src or src in dest_dir.parents):
+                raise InvalidPathError("Cannot move a folder into itself")
+            if src.parent == dest_dir:
+                continue
+            for s, d in self._plan_group(src, dest_dir, req.on_conflict):
+                move_path(s, d)
+                self.detection.forget(s)
+                if s == src:
+                    result.paths.append(PathRef(root_id=req.dest_root_id, path=to_rel(dest_root, d)))
+            changed.add((item.root_id, to_rel(src_root, src.parent)))
+        for root_id, rel in changed:
+            self.notify_changed(root_id, rel)
+        return result
+
+    def rename(self, req: RenameRequest) -> OperationResult:
+        _, root_path, src = self._resolve(req.root_id, req.path)
+        if src == root_path:
+            raise InvalidPathError("Cannot rename a root")
+        new_name = validate_name(req.new_name.strip())
+        if self._is_model(src) and not src.is_dir():
+            ext = src.suffix
+            new_stem = new_name[: -len(ext)] if new_name.lower().endswith(ext.lower()) else new_name
+            validate_name(new_stem)
+            pairs = self._plan_group(src, src.parent, "error", new_stem=new_stem)
+        elif self._is_model(src):
+            pairs = self._plan_group(src, src.parent, "error", new_stem=new_name)
+        else:
+            target = src.parent / new_name
+            if target.exists():
+                raise ConflictError(f"Target exists: {new_name}")
+            pairs = [(src, target)]
+        new_path = src
+        for s, d in pairs:
+            if s == d:
+                continue
+            rename_no_overwrite(s, d)
+            self.detection.forget(s)
+            if s == src:
+                new_path = d
+        self.notify_changed(req.root_id, to_rel(root_path, src.parent))
+        return OperationResult(paths=[PathRef(root_id=req.root_id, path=to_rel(root_path, new_path))])
+
+    def delete(self, req: DeleteRequest) -> OperationResult:
+        to_trash = self.settings.settings.library.delete_to_trash and not req.permanent
+        result = OperationResult()
+        targets: list[tuple[str, Path, Path]] = []
+        for item in req.items:
+            _, root_path, src = self._resolve(item.root_id, item.path)
+            if src == root_path:
+                raise InvalidPathError("Cannot delete a root")
+            targets.append((item.root_id, root_path, src))
+        for root_id, root_path, src in targets:
+            if not src.exists():
+                continue
+            for member in self._group(src):
+                if to_trash:
+                    result.trashed_to.append(self._trash(member))
+                else:
+                    remove_path(member)
+                self.detection.forget(member)
+            result.paths.append(PathRef(root_id=root_id, path=to_rel(root_path, src)))
+            self.notify_changed(root_id, to_rel(root_path, src.parent))
+        return result
+
+    def _trash(self, path: Path) -> str:
+        try:
+            from send2trash import send2trash
+
+            send2trash(str(path))
+            return "system"
+        except Exception as e:  # noqa: BLE001 - any trash failure falls back to our own folder
+            logger.info("System trash failed for %s (%s); using the data directory", path, e)
+        fallback = self.settings.data_dir / "trash" / time.strftime("%Y%m%d-%H%M%S")
+        fallback.mkdir(parents=True, exist_ok=True)
+        move_path(path, unique_path(fallback / path.name))
+        return str(fallback)
+
+    def create_folder(self, req: FolderCreate) -> PathRef:
+        _, root_path, parent = self._resolve(req.root_id, req.path)
+        name = validate_name(req.name.strip())
+        target = parent / name
+        if target.exists():
+            raise ConflictError(f"Already exists: {name}")
+        target.mkdir()
+        self.notify_changed(req.root_id, to_rel(root_path, parent))
+        return PathRef(root_id=req.root_id, path=to_rel(root_path, target))
+
+    @staticmethod
+    def layouts() -> dict[str, dict[str, str]]:
+        """Folder-to-kind maps of every layout preset."""
+        return {name: dict(mapping) for name, mapping in LAYOUTS.items()}

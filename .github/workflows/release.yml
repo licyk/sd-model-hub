@@ -1,0 +1,179 @@
+name: Release
+
+# Publishing happens when a version tag is pushed:
+#
+#   python scripts/dev.py check          # locally, first
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# "Run workflow" publishes to TestPyPI instead, so a release can be rehearsed. Nothing is
+# published unless the checks, the tag and the version in sd_model_hub/version.py all agree.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # scripts/build_wheel.py reads this: the type-check runs as its own job below.
+  CI: '1'
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          python -m ruff check sd_model_hub tests scripts
+          python -m ruff format --check sd_model_hub tests scripts
+      - name: Tests
+        run: python -m pytest -q
+
+  web:
+    name: Web UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pip install -e ".[dev]"
+      - run: bun install --frozen-lockfile
+        working-directory: sd_model_hub/webui
+      - name: Tests and type-check
+        run: |
+          bun run test
+          bun run typecheck
+        working-directory: sd_model_hub/webui
+      - name: The committed API types match the schema
+        run: python scripts/dev.py typegen-check
+
+  build:
+    name: Build the wheel
+    needs: [python, web]
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pip install --upgrade build twine
+
+      - name: The tag and sd_model_hub/version.py agree
+        id: version
+        run: |
+          version=$(python -c "from sd_model_hub.version import VERSION; print(VERSION)")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Package version: $version"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            if [ "$tag" != "$version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $version in sd_model_hub/version.py"
+              exit 1
+            fi
+          fi
+
+      # Builds the web UI with bun first: setuptools packages only the files that exist then.
+      - name: Build
+        run: python scripts/build_wheel.py --ci
+
+      - name: The wheel carries the web UI
+        run: |
+          python - <<'PY'
+          import pathlib, zipfile
+          wheel = next(pathlib.Path("dist").glob("*.whl"))
+          names = zipfile.ZipFile(wheel).namelist()
+          assert any(n.startswith("sd_model_hub/webui/dist/") for n in names), "the wheel has no web UI"
+          assert "sd_model_hub/webui/dist/index.html" in names, "the wheel has no index.html"
+          assert any(n.endswith("rules_data/diffusion.json") for n in names), "the wheel has no detection rules"
+          print(wheel.name, f"{wheel.stat().st_size / 1e6:.1f} MB", len(names), "files")
+          PY
+
+      - name: Check the metadata
+        run: twine check dist/*
+
+      - name: The wheel installs and runs
+        run: |
+          python -m venv /tmp/probe
+          /tmp/probe/bin/pip install --quiet dist/*.whl
+          /tmp/probe/bin/sd-model-hub version
+          /tmp/probe/bin/python -c "import sd_model_hub; print(sd_model_hub.VERSION)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'pypi' }}
+    needs: build
+    runs-on: ubuntu-latest
+    # The environment holds the trusted publisher and can require an approval before a release.
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'pypi' }}
+      url: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi' && 'https://test.pypi.org/p/sd-model-hub' || 'https://pypi.org/p/sd-model-hub' }}
+    permissions:
+      # Trusted publishing: PyPI verifies this workflow's identity, so no API token is stored.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi' && 'https://test.pypi.org/legacy/' || '' }}
+          print-hash: true
+
+  github-release:
+    name: GitHub release
+    needs: [build, publish]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Create the release with the built files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes

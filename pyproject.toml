@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools", "pip", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sd-model-hub"
+description = "Download and manage Stable Diffusion models from the command line and a web UI"
+readme = "README.md"
+requires-python = ">=3.10"
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    # uvicorn speaks WebSocket only when one of these is installed. Without it the socket falls
+    # back to long polling, which works but is slower and noisier.
+    "websockets>=12",
+    "python-socketio",
+    "pydantic>=2",
+    "httpx",
+    "huggingface_hub",
+    "modelscope",
+    "typer>=0.26.7,<0.28",
+    "rich",
+    "Pillow>=10.0",
+    "send2trash",
+    "tomli-w",
+    "tomli; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+"sd-model-hub" = "sd_model_hub.cli.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sd_model_hub*"]
+
+[tool.setuptools.package-data]
+"sd_model_hub.webui" = ["dist/**/*"]
+"sd_model_hub.core.detection" = ["rules_data/*.json"]
+
+[tool.setuptools.dynamic]
+version = { attr = "sd_model_hub.version.VERSION" }
+
+[tool.ruff]
+line-length = 180
+indent-width = 4
+extend-exclude = ["sd_model_hub/webui/dist", "sd_model_hub/webui/node_modules"]
+lint.ignore = [
+    "E402" # module-import-not-at-top-of-file
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: tests that call real remote services (deselected by default)",
+]
+addopts = "-m 'not live'"

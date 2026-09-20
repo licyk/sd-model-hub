@@ -1,0 +1,162 @@
+[
+  {
+    "id": "sdxl-refiner",
+    "base_model": "sdxl-refiner",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "shapes": {"label_emb.0.0.weight": [null, 2560]},
+    "priority": 110,
+    "confidence": 0.95
+  },
+  {
+    "id": "svd",
+    "base_model": "svd",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["input_blocks.1.0.time_mixer.mix_factor"],
+    "priority": 105,
+    "confidence": 0.9
+  },
+  {
+    "id": "sdxl",
+    "base_model": "sdxl",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "shapes": {"label_emb.0.0.weight": [null, 2816]},
+    "prediction": [
+      {"key": "edm_vpred.sigma_max", "value": "v_edm"},
+      {"key": "edm_mean", "value": "edm"},
+      {"key": "v_pred", "value": "v"}
+    ],
+    "priority": 100,
+    "confidence": 0.95
+  },
+  {
+    "id": "sd2",
+    "base_model": "sd2",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "shapes": {"input_blocks.1.1.transformer_blocks.0.attn2.to_k.weight": [null, 1024]},
+    "priority": 90,
+    "confidence": 0.95
+  },
+  {
+    "id": "sd1",
+    "base_model": "sd1",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "shapes": {"input_blocks.1.1.transformer_blocks.0.attn2.to_k.weight": [null, 768]},
+    "priority": 90,
+    "confidence": 0.95
+  },
+  {
+    "id": "sd3",
+    "base_model": "sd3",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["joint_blocks.0.context_block.attn.qkv.weight"],
+    "priority": 80
+  },
+  {
+    "id": "chroma",
+    "base_model": "chroma",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["double_blocks.0.img_attn.norm.key_norm.scale", "distilled_guidance_layer.in_proj.weight"],
+    "priority": 70
+  },
+  {
+    "id": "flux2",
+    "base_model": "flux2",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["double_blocks.0.img_attn.norm.key_norm.scale", "double_stream_modulation_img.lin.weight"],
+    "priority": 65,
+    "confidence": 0.7
+  },
+  {
+    "id": "flux1",
+    "base_model": "flux1",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["double_blocks.0.img_attn.norm.key_norm.scale", "img_in.weight"],
+    "priority": 60
+  },
+  {
+    "id": "auraflow",
+    "base_model": "auraflow",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["double_layers.0.attn.w1q.weight"],
+    "priority": 50
+  },
+  {
+    "id": "hunyuan-dit",
+    "base_model": "hunyuan-dit",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["mlp_t5.0.weight"],
+    "priority": 50
+  },
+  {
+    "id": "hunyuan-video",
+    "base_model": "hunyuan-video",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["txt_in.individual_token_refiner.blocks.0.norm1.weight"],
+    "priority": 50
+  },
+  {
+    "id": "mochi",
+    "base_model": "mochi",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["t5_yproj.weight"],
+    "priority": 50
+  },
+  {
+    "id": "ltxv",
+    "base_model": "ltxv",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["adaln_single.emb.timestep_embedder.linear_1.bias"],
+    "priority": 50
+  },
+  {
+    "id": "pixart",
+    "base_model": "pixart",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["t_block.1.weight"],
+    "priority": 45
+  },
+  {
+    "id": "lumina2",
+    "base_model": "lumina2",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["cap_embedder.1.weight", "noise_refiner.0.attention.k_norm.weight"],
+    "priority": 50
+  },
+  {
+    "id": "wan",
+    "base_model": "wan",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["head.modulation"],
+    "priority": 50
+  },
+  {
+    "id": "qwen-image",
+    "base_model": "qwen-image",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["txt_norm.weight"],
+    "priority": 40,
+    "confidence": 0.8
+  },
+  {
+    "id": "hidream",
+    "base_model": "hidream",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["caption_projection.0.linear.weight"],
+    "priority": 50
+  },
+  {
+    "id": "cosmos",
+    "base_model": "cosmos",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["blocks.0.adaln_modulation_self_attn.1.weight"],
+    "priority": 50,
+    "confidence": 0.8
+  },
+  {
+    "id": "stable-cascade",
+    "base_model": "stable-cascade",
+    "kinds": ["checkpoint", "diffusion_model"],
+    "required_keys": ["clf.1.weight"],
+    "priority": 50
+  }
+]

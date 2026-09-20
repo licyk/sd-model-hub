@@ -1,0 +1,280 @@
+import io
+import json
+from urllib.parse import parse_qs, urlsplit
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
+
+from sd_model_hub.api.app import create_app
+from sd_model_hub.core.context import build_services
+from tests.conftest import LORA_SDXL, write_safetensors
+
+HOST = {"host": "localhost"}
+
+
+@pytest.fixture
+def services(tmp_path):
+    s = build_services(data_dir=tmp_path / "data", environ={})
+    yield s
+    s.close()
+
+
+@pytest.fixture
+def client(services):
+    app = create_app(services, bound_host="127.0.0.1", start_downloads=False, serve_ui=False)
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c
+
+
+@pytest.fixture
+def root(client, tmp_path):
+    d = tmp_path / "models"
+    (d / "loras").mkdir(parents=True)
+    r = client.post("/api/v1/library/roots", json={"path": str(d), "layout": "comfyui"}, headers={"origin": "http://localhost"})
+    assert r.status_code == 201, r.text
+    return r.json()["id"], d
+
+
+def test_health_and_version(client):
+    assert client.get("/api/v1/app/health").json() == {"status": "ok", "auth_required": False}
+    assert client.get("/api/v1/app/meta").json()["layouts"]["comfyui"]["loras"] == "lora"
+
+
+def test_error_shape(client):
+    r = client.get("/api/v1/library/roots/nope/entries")
+    assert r.status_code == 404
+    assert r.json()["code"] == "not_found" and "nope" in r.json()["message"]
+
+
+def test_settings_hide_tokens(client, services):
+    r = client.patch("/api/v1/settings", json={"sources": {"civitai": {"token": "SECRET"}}})
+    assert r.status_code == 200 and "SECRET" not in r.text
+    assert r.json()["sources"]["civitai"]["token_configured"] is True
+    assert services.settings.settings.sources["civitai"].token == "SECRET"
+    assert client.patch("/api/v1/settings", json={"server": {"port": 0}}).status_code == 400
+    assert client.patch("/api/v1/settings", json={"paths": {}}).status_code == 400
+
+
+def test_client_state(client):
+    assert client.get("/api/v1/client-state/theme").json() is None
+    client.put("/api/v1/client-state/theme", json={"mode": "dark"})
+    assert client.get("/api/v1/client-state/theme").json() == {"mode": "dark"}
+
+
+def test_library_listing_and_preview(client, root):
+    root_id, d = root
+    write_safetensors(d / "loras" / "a.safetensors", LORA_SDXL)
+    img = io.BytesIO()
+    Image.new("RGB", (800, 600), "red").save(img, "PNG")
+    (d / "loras" / "a.png").write_bytes(img.getvalue())
+    listing = client.get(f"/api/v1/library/roots/{root_id}/entries", params={"path": "loras"}).json()
+    assert listing["models"][0]["preview"] == "loras/a.png"
+    r = client.get(f"/api/v1/library/roots/{root_id}/preview", params={"path": "loras/a.png", "size": 256})
+    assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
+    assert Image.open(io.BytesIO(r.content)).size[0] == 256
+    assert client.get(f"/api/v1/library/roots/{root_id}/preview", params={"path": "loras/a.safetensors"}).status_code == 404
+    assert client.get(f"/api/v1/library/roots/{root_id}/entries", params={"path": "../.."}).status_code == 400
+
+
+def test_upload_streams_raw_body(client, root):
+    root_id, d = root
+    body = b"x" * (3 * 1024 * 1024 + 7)
+    r = client.put("/api/v1/library/upload", params={"root_id": root_id, "path": "loras", "name": "dir/up.safetensors"}, content=body, headers={"origin": "http://localhost"})
+    assert r.status_code == 201, r.text
+    assert r.json()["path"] == "loras/dir/up.safetensors"
+    assert (d / "loras" / "dir" / "up.safetensors").read_bytes() == body
+    again = client.put("/api/v1/library/upload", params={"root_id": root_id, "path": "loras", "name": "dir/up.safetensors"}, content=b"y", headers={"origin": "http://localhost"})
+    assert again.status_code == 409
+    bad = client.put("/api/v1/library/upload", params={"root_id": root_id, "path": "loras", "name": "../evil"}, content=b"y", headers={"origin": "http://localhost"})
+    assert bad.status_code == 400
+    assert not list((d / "loras").rglob("*.part"))
+
+
+def test_rename_move_delete_via_api(client, root):
+    root_id, d = root
+    write_safetensors(d / "loras" / "m.safetensors", LORA_SDXL)
+    h = {"origin": "http://localhost"}
+    r = client.post("/api/v1/library/rename", json={"root_id": root_id, "path": "loras/m.safetensors", "new_name": "n"}, headers=h)
+    assert r.json()["paths"][0]["path"] == "loras/n.safetensors"
+    client.post("/api/v1/library/folders", json={"root_id": root_id, "path": "", "name": "archive"}, headers=h)
+    r = client.post("/api/v1/library/move", json={"items": [{"root_id": root_id, "path": "loras/n.safetensors"}], "dest_root_id": root_id, "dest_dir": "archive"}, headers=h)
+    assert r.json()["paths"][0]["path"] == "archive/n.safetensors"
+    r = client.post("/api/v1/library/delete", json={"items": [{"root_id": root_id, "path": "archive/n.safetensors"}], "permanent": True}, headers=h)
+    assert r.status_code == 200 and not (d / "archive" / "n.safetensors").exists()
+
+
+def test_host_header_checked(client):
+    assert client.get("/api/v1/app/version", headers={"host": "evil.example"}).status_code == 400
+    assert client.get("/api/v1/app/version", headers={"host": "127.0.0.1:7865"}).status_code == 200
+
+
+def test_cross_origin_writes_refused(client):
+    r = client.put("/api/v1/client-state/x", json=1, headers={"origin": "https://evil.example"})
+    assert r.status_code == 403 and r.json()["code"] == "bad_origin"
+    r = client.put("/api/v1/client-state/x", json=1, headers={"sec-fetch-site": "cross-site"})
+    assert r.status_code == 403
+    assert client.put("/api/v1/client-state/x", json=1, headers={"origin": "http://localhost"}).status_code == 200
+    # No Origin and no Sec-Fetch-Site: a non-browser client such as curl.
+    assert client.put("/api/v1/client-state/x", json=1).status_code == 200
+
+
+def test_access_token(services, client):
+    services.settings.update({"server": {"access_token": "tok"}})
+    assert client.get("/api/v1/settings").status_code == 401
+    assert client.get("/api/v1/app/health").json()["auth_required"] is True
+    assert client.get("/api/v1/settings", headers={"authorization": "Bearer tok"}).status_code == 200
+    assert client.get("/api/v1/settings", cookies={"sd_model_hub_token": "tok"}).status_code == 200
+    assert client.get("/api/v1/settings", headers={"authorization": "Bearer wrong"}).status_code == 401
+
+
+def test_openapi_has_events(client):
+    schema = client.get("/openapi.json").json()
+    assert "download_progress" in schema["components"]["schemas"]["ServerEvents"]["properties"]
+    assert schema["paths"]["/api/v1/hubs/{hub}/repos/{repo_id}/files"]["get"]["operationId"] == "list_repo_files"
+
+
+CIVITAI_AUTH = "/api/v1/auth/civitai"
+
+
+@pytest.fixture
+def oauth_client(tmp_path):
+    """A client whose network is a stand-in Civitai authorization service."""
+    from tests.core.test_auth import CLIENT_ID, Provider
+
+    provider = Provider()
+    services = build_services(data_dir=tmp_path / "data", environ={}, transport=httpx.MockTransport(provider))
+    services.settings.update({"auth": {"civitai": {"oauth_client_id": CLIENT_ID, "use_keyring": False}}})
+    app = create_app(services, bound_host="127.0.0.1", bound_port=7865, start_downloads=False, serve_ui=False)
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c, services, provider
+    services.close()
+
+
+def test_oauth_round_trip_through_the_api(oauth_client):
+    client, _services, provider = oauth_client
+    start = client.post(f"{CIVITAI_AUTH}/start", json={"return_to": "/#/settings"}, headers={"origin": "http://localhost"})
+    assert start.status_code == 200
+    url = start.json()["authorization_url"]
+    assert url.startswith("https://auth.civitai.com/api/auth/oauth/authorize?")
+    assert "code_challenge_method=S256" in url
+    # The browser binding is an HttpOnly cookie, scoped to the auth routes.
+    cookie = next(c for c in start.headers.get_list("set-cookie") if c.startswith("sd_model_hub_oauth="))
+    assert "httponly" in cookie.lower() and "samesite=lax" in cookie.lower() and "Path=/api/v1/auth/civitai" in cookie
+    assert "access_token" not in start.text
+
+    state = parse_qs(urlsplit(url).query)["state"][0]
+    callback = client.get(f"{CIVITAI_AUTH}/callback", params={"code": "the-code", "state": state}, follow_redirects=False)
+    assert callback.status_code == 303
+    assert callback.headers["location"] == "/#/settings?civitai=connected"
+    assert callback.headers["cache-control"] == "no-store" and callback.headers["referrer-policy"] == "no-referrer"
+    assert "access-1" not in callback.text
+
+    status = client.get(f"{CIVITAI_AUTH}/status").json()
+    assert status["oauth_state"] == "connected" and status["account"]["username"] == "someone"
+    # Status describes the connection; it never carries a credential value.
+    assert not any(secret in json.dumps(status) for secret in ("access-1", "refresh-1"))
+
+    # The callback used the address the server is bound to.
+    exchange = next(r for r in provider.requests if r.url.path.endswith("/token"))
+    assert parse_qs(exchange.content.decode())["redirect_uri"] == ["http://127.0.0.1:7865/api/v1/auth/civitai/callback"]
+
+
+def test_callback_without_the_cookie_is_refused(oauth_client):
+    client, services, provider = oauth_client
+    start = client.post(f"{CIVITAI_AUTH}/start", headers={"origin": "http://localhost"})
+    state = parse_qs(urlsplit(start.json()["authorization_url"]).query)["state"][0]
+    client.cookies.clear()
+    callback = client.get(f"{CIVITAI_AUTH}/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    assert callback.status_code == 303 and callback.headers["location"].endswith("civitai=error")
+    assert services.auth.store.load() is None
+    # The code was never exchanged.
+    assert not [r for r in provider.requests if r.url.path.endswith("/token")]
+
+
+def test_refused_authorization_returns_to_settings(oauth_client):
+    client, services, _provider = oauth_client
+    start = client.post(f"{CIVITAI_AUTH}/start", headers={"origin": "http://localhost"})
+    state = parse_qs(urlsplit(start.json()["authorization_url"]).query)["state"][0]
+    callback = client.get(f"{CIVITAI_AUTH}/callback", params={"error": "access_denied", "state": state}, follow_redirects=False)
+    assert callback.status_code == 303 and callback.headers["location"].endswith("civitai=error")
+    # The transaction is dropped, so nothing is left pending.
+    assert services.auth.status().oauth_state == "not_connected"
+
+
+def test_only_the_callback_is_exempt_from_the_access_token(oauth_client):
+    client, services, _provider = oauth_client
+    services.settings.update({"server": {"access_token": "tok"}})
+    # The callback has to work: the browser arrives from Civitai with no header.
+    assert client.get(f"{CIVITAI_AUTH}/callback", params={"error": "access_denied"}, follow_redirects=False).status_code == 303
+    # Everything else keeps normal access control.
+    assert client.get(f"{CIVITAI_AUTH}/status").status_code == 401
+    assert client.post(f"{CIVITAI_AUTH}/start", headers={"origin": "http://localhost"}).status_code == 401
+    assert client.post(f"{CIVITAI_AUTH}/disconnect", headers={"origin": "http://localhost"}).status_code == 401
+    assert client.post(f"{CIVITAI_AUTH}/callback", headers={"origin": "http://localhost"}).status_code in (401, 405)
+    assert client.get(f"{CIVITAI_AUTH}/status", headers={"authorization": "Bearer tok"}).status_code == 200
+
+
+def test_callback_still_checks_the_host_header(oauth_client):
+    client, _services, _provider = oauth_client
+    assert client.get(f"{CIVITAI_AUTH}/callback", params={"error": "x"}, headers={"host": "evil.example"}, follow_redirects=False).status_code == 400
+
+
+def test_manual_token_and_oauth_are_separate_over_the_api(oauth_client):
+    client, services, _provider = oauth_client
+    h = {"origin": "http://localhost"}
+    client.patch("/api/v1/settings", json={"sources": {"civitai": {"token": "manual"}}}, headers=h)
+    start = client.post(f"{CIVITAI_AUTH}/start", headers=h)
+    state = parse_qs(urlsplit(start.json()["authorization_url"]).query)["state"][0]
+    client.get(f"{CIVITAI_AUTH}/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    assert client.get(f"{CIVITAI_AUTH}/status").json()["method"] == "oauth"
+
+    disconnected = client.post(f"{CIVITAI_AUTH}/disconnect", headers=h).json()
+    assert disconnected["manual_token_configured"] is True
+    assert services.settings.settings.sources["civitai"].token == "manual"
+    # Nothing switched by itself; the user asks for the manual token explicitly.
+    assert disconnected["method"] == "oauth"
+    chosen = client.post(f"{CIVITAI_AUTH}/method", json={"method": "manual"}, headers=h).json()
+    assert chosen["method"] == "manual" and chosen["effective_method"] == "manual"
+
+
+def test_unconfigured_oauth_explains_itself(client):
+    r = client.post(f"{CIVITAI_AUTH}/start", headers={"origin": "http://localhost"})
+    assert r.status_code == 400 and "oauth_client_id" in r.json()["message"]
+    assert client.get(f"{CIVITAI_AUTH}/status").json()["oauth_configured"] is False
+
+
+def test_socketio_endpoint_answers(client):
+    r = client.get("/ws/socket.io/", params={"EIO": "4", "transport": "polling"})
+    assert r.status_code == 200 and r.text.startswith("0{")
+
+
+def test_repo_ids_with_slash_route(services, client, monkeypatch):
+    from sd_model_hub.core.hubs.models import RepoDetail
+
+    seen = {}
+
+    def fake_get_repo(hub, repo_id, revision=None):
+        seen["args"] = (hub, repo_id, revision)
+        return RepoDetail(hub=hub, id=repo_id, name="r", page_url="u", revision="main")
+
+    monkeypatch.setattr(services.hubs, "get_repo", fake_get_repo)
+    assert client.get("/api/v1/hubs/huggingface/repos/owner/name").status_code == 200
+    assert seen["args"] == ("huggingface", "owner/name", None)
+
+
+def test_static_fallback(tmp_path, services, monkeypatch):
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html>ui</html>")
+    (dist / "assets" / "app-abc.js").write_text("js")
+    monkeypatch.setattr("sd_model_hub.api.app.web_dist_dir", lambda: dist)
+    app = create_app(services, bound_host="127.0.0.1", start_downloads=False)
+    with TestClient(app, base_url="http://localhost") as c:
+        page = c.get("/library/deep/link", headers={"accept": "text/html"})
+        assert page.status_code == 200 and "ui" in page.text and page.headers["cache-control"] == "no-cache"
+        assert c.get("/assets/missing.js", headers={"accept": "*/*"}).status_code == 404
+        asset = c.get("/assets/app-abc.js")
+        assert "immutable" in asset.headers["cache-control"]
+        assert c.get("/api/v1/app/version").status_code == 200

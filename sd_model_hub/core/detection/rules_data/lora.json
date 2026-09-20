@@ -1,0 +1,82 @@
+[
+  {
+    "id": "lora-flux1",
+    "base_model": "flux1",
+    "kinds": ["lora"],
+    "any_key_prefixes": [
+      "lora_unet_double_blocks_",
+      "lora_unet_single_blocks_",
+      "diffusion_model.double_blocks.",
+      "diffusion_model.single_blocks.",
+      "transformer.single_transformer_blocks.",
+      "double_blocks.",
+      "single_blocks."
+    ],
+    "priority": 60,
+    "confidence": 0.85
+  },
+  {
+    "id": "lora-cosmos",
+    "base_model": "cosmos",
+    "kinds": ["lora"],
+    "any_key_prefixes": ["lora_unet_blocks_0_adaln_modulation_", "diffusion_model.blocks.0.adaln_modulation_", "net.blocks.0.adaln_modulation_"],
+    "priority": 58,
+    "confidence": 0.85
+  },
+  {
+    "id": "lora-wan",
+    "base_model": "wan",
+    "kinds": ["lora"],
+    "regex_shapes": [{"regex": "^(diffusion_model\\.)?blocks\\.\\d+\\.cross_attn\\.k\\.", "shape": []}],
+    "priority": 55,
+    "confidence": 0.8
+  },
+  {
+    "id": "lora-sdxl-context",
+    "base_model": "sdxl",
+    "kinds": ["lora"],
+    "regex_shapes": [{"regex": "^.*attn2[._]to_k\\.(lora_down|lora_A|lora\\.down)\\.weight$", "shape": [null, 2048]}],
+    "priority": 50,
+    "confidence": 0.9
+  },
+  {
+    "id": "lora-sd2-context",
+    "base_model": "sd2",
+    "kinds": ["lora"],
+    "regex_shapes": [{"regex": "^.*attn2[._]to_k\\.(lora_down|lora_A|lora\\.down)\\.weight$", "shape": [null, 1024]}],
+    "priority": 50,
+    "confidence": 0.85
+  },
+  {
+    "id": "lora-sd1-context",
+    "base_model": "sd1",
+    "kinds": ["lora"],
+    "regex_shapes": [{"regex": "^.*attn2[._]to_k\\.(lora_down|lora_A|lora\\.down)\\.weight$", "shape": [null, 768]}],
+    "priority": 50,
+    "confidence": 0.9
+  },
+  {
+    "id": "lora-sdxl-te",
+    "base_model": "sdxl",
+    "kinds": ["lora"],
+    "any_key_prefixes": ["lora_te1_", "lora_te2_"],
+    "priority": 40,
+    "confidence": 0.8
+  },
+  {
+    "id": "lora-sdxl-sgm-names",
+    "base_model": "sdxl",
+    "kinds": ["lora"],
+    "any_key_prefixes": ["lora_unet_input_blocks_", "lora_unet_output_blocks_", "lora_unet_middle_block_"],
+    "priority": 30,
+    "confidence": 0.6
+  },
+  {
+    "id": "lora-sd1-diffusers-names",
+    "base_model": "sd1",
+    "kinds": ["lora"],
+    "any_key_prefixes": ["lora_unet_down_blocks_", "lora_unet_up_blocks_"],
+    "priority": 20,
+    "confidence": 0.5
+  }
+]

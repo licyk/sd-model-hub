@@ -1,0 +1,116 @@
+[
+  {
+    "id": "te-clip-g",
+    "base_model": "clip-g",
+    "kinds": ["text_encoder"],
+    "required_keys": ["text_model.encoder.layers.30.self_attn.q_proj.weight"],
+    "priority": 30
+  },
+  {
+    "id": "te-clip-g-openclip",
+    "base_model": "clip-g",
+    "kinds": ["text_encoder"],
+    "required_keys": ["transformer.resblocks.30.attn.in_proj_weight"],
+    "priority": 30
+  },
+  {
+    "id": "te-clip-h",
+    "base_model": "clip-h",
+    "kinds": ["text_encoder"],
+    "required_keys": ["text_model.encoder.layers.22.self_attn.q_proj.weight"],
+    "priority": 20
+  },
+  {
+    "id": "te-clip-h-openclip",
+    "base_model": "clip-h",
+    "kinds": ["text_encoder"],
+    "required_keys": ["transformer.resblocks.22.attn.in_proj_weight"],
+    "priority": 20
+  },
+  {
+    "id": "te-clip-l",
+    "base_model": "clip-l",
+    "kinds": ["text_encoder"],
+    "required_keys": ["text_model.encoder.layers.0.self_attn.q_proj.weight"],
+    "absent_keys": ["text_model.encoder.layers.22.self_attn.q_proj.weight"],
+    "priority": 10
+  },
+  {
+    "id": "te-t5",
+    "base_model": "t5",
+    "kinds": ["text_encoder"],
+    "required_keys": ["encoder.block.0.layer.0.SelfAttention.q.weight"],
+    "priority": 10
+  },
+  {
+    "id": "te-llm",
+    "base_model": "llm",
+    "kinds": ["text_encoder"],
+    "any_key_prefixes": ["model.layers.0.self_attn.", "layers.0.self_attn."],
+    "priority": 0,
+    "confidence": 0.6
+  },
+  {
+    "id": "embedding-sdxl",
+    "base_model": "sdxl",
+    "kinds": ["embedding"],
+    "required_keys": ["clip_l", "clip_g"],
+    "priority": 20
+  },
+  {
+    "id": "embedding-sd1",
+    "base_model": "sd1",
+    "kinds": ["embedding"],
+    "regex_shapes": [{"regex": "^(emb_params$|string_to_param\\.)", "shape": [null, 768]}],
+    "priority": 10,
+    "confidence": 0.8
+  },
+  {
+    "id": "embedding-sd2",
+    "base_model": "sd2",
+    "kinds": ["embedding"],
+    "regex_shapes": [{"regex": "^(emb_params$|string_to_param\\.)", "shape": [null, 1024]}],
+    "priority": 10,
+    "confidence": 0.8
+  },
+  {
+    "id": "controlnet-sdxl-diffusers",
+    "base_model": "sdxl",
+    "kinds": ["controlnet"],
+    "regex_shapes": [{"regex": "^down_blocks\\.\\d+\\.attentions\\.0\\.transformer_blocks\\.0\\.attn2\\.to_k\\.weight$", "shape": [null, 2048]}],
+    "priority": 20,
+    "confidence": 0.8
+  },
+  {
+    "id": "controlnet-sd1-diffusers",
+    "base_model": "sd1",
+    "kinds": ["controlnet"],
+    "regex_shapes": [{"regex": "^down_blocks\\.\\d+\\.attentions\\.0\\.transformer_blocks\\.0\\.attn2\\.to_k\\.weight$", "shape": [null, 768]}],
+    "priority": 20,
+    "confidence": 0.8
+  },
+  {
+    "id": "controlnet-sdxl",
+    "base_model": "sdxl",
+    "kinds": ["controlnet"],
+    "shapes": {"label_emb.0.0.weight": [null, 2816]},
+    "priority": 20,
+    "confidence": 0.8
+  },
+  {
+    "id": "controlnet-sd2",
+    "base_model": "sd2",
+    "kinds": ["controlnet"],
+    "shapes": {"input_blocks.1.1.transformer_blocks.0.attn2.to_k.weight": [null, 1024]},
+    "priority": 10,
+    "confidence": 0.8
+  },
+  {
+    "id": "controlnet-sd1",
+    "base_model": "sd1",
+    "kinds": ["controlnet"],
+    "shapes": {"input_blocks.1.1.transformer_blocks.0.attn2.to_k.weight": [null, 768]},
+    "priority": 10,
+    "confidence": 0.8
+  }
+]
