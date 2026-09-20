@@ -16,18 +16,21 @@ class RootInfo(Record):
     path: str
     layout: LayoutName
     exists: bool
+    kind: str | None = None
 
 
 class RootCreate(Record):
     name: str | None = None
     path: str
     layout: LayoutName = "custom"
+    kind: str | None = None
 
 
 class RootUpdate(Record):
     name: str | None = None
     path: str | None = None
     layout: LayoutName | None = None
+    kind: str | None = None
 
 
 class FolderEntry(Record):

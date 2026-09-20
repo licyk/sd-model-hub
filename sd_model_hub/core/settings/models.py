@@ -27,6 +27,8 @@ class ModelRoot(Record):
     name: str
     path: str
     layout: LayoutName = "custom"
+    kind: str | None = None
+    """Fallback folder hint for a root dedicated to one model kind; never overrides detection."""
 
 
 class PathSettings(Record):
@@ -51,9 +53,15 @@ class NetworkSettings(Record):
     max_retries: int = Field(default=3, ge=0, le=20)
 
 
+class DownloadDestination(Record):
+    root_id: str
+    rel_dir: str = ""
+
+
 class DownloadSettings(Record):
     default_root: str | None = None
     kind_folders: dict[str, str] = Field(default_factory=dict)
+    kind_destinations: dict[str, DownloadDestination | None] = Field(default_factory=dict)
     save_preview: bool = True
     save_metadata: bool = True
     write_webui_metadata: bool = False

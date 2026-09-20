@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from sd_model_hub.api.paths import route_path
 from sd_model_hub.core.net.ports import is_loopback
 
 TOKEN_COOKIE = "sd_model_hub_token"
@@ -114,7 +115,7 @@ class SecurityMiddleware:
                 return 403, "bad_origin", "Cross-site request refused"
 
         token = self.access_token()
-        path = scope.get("path", "")
+        path = route_path(scope)
         is_callback = path == self.callback_path and method == "GET"
         needs_token = path.startswith(self.protected_prefixes) and not path.startswith(self.public_paths) and not is_callback
         if token and needs_token:

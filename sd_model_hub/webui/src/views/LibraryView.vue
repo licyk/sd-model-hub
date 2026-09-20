@@ -228,7 +228,7 @@ function openRootDialog(edit: boolean) {
   rootError.value = null;
   rootDialogOpen.value = true;
 }
-function saveRoot(form: { name: string | null; path: string; layout: 'comfyui' | 'sd-webui' | 'custom' }) {
+function saveRoot(form: { name: string | null; path: string; layout: 'comfyui' | 'sd-webui' | 'custom'; kind: string | null }) {
   const onError = (e: unknown) => (rootError.value = (e as Error).message);
   if (editingRoot.value && rootId.value) {
     m.updateRoot.mutate({ id: rootId.value, body: form }, { onSuccess: () => (rootDialogOpen.value = false), onError });

@@ -8,7 +8,9 @@ from collections.abc import Callable
 from typing import Any
 
 import socketio
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from sd_model_hub.api.paths import route_path
 from sd_model_hub.api.security import request_token
 from sd_model_hub.core.events import EventBase, EventBus
 
@@ -26,13 +28,17 @@ class SocketBridge:
         self._unsubscribe: Callable[[], None] | None = None
         self.sio.on("connect", self._on_connect)
 
-    def asgi_app(self, prefix: str = "") -> socketio.ASGIApp:
-        """The ASGI app to mount at ``{prefix}/ws``.
+    def asgi_app(self, prefix: str = "") -> ASGIApp:
+        """Normalize Starlette's mount scope before engineio matches its endpoint.
 
-        engineio matches on the whole request path, which Starlette keeps under a mount, so it is
-        given the full path including any prefix the host application asked for.
+        ``prefix`` remains accepted for callers of earlier versions; the mount supplies it.
         """
-        return socketio.ASGIApp(self.sio, socketio_path=f"{prefix}/ws/socket.io")
+        app = socketio.ASGIApp(self.sio, socketio_path="/socket.io")
+
+        async def mounted(scope: Scope, receive: Receive, send: Send) -> None:
+            await app({**scope, "path": route_path(scope)}, receive, send)
+
+        return mounted
 
     async def _on_connect(self, sid: str, environ: dict[str, Any], auth: dict[str, Any] | None = None) -> bool:
         token = self.access_token()

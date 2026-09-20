@@ -170,14 +170,10 @@ class DownloadManager:
             except NotFoundError:
                 return None, "", dest
             return root_id, rel, dest
-        root_id = req.root_id or self.settings.settings.downloads.default_root
-        roots = self.library.list_roots()
-        if root_id is None:
-            if not roots:
-                raise ValidationError("No destination: add a model root, or give a destination folder")
-            root_id = roots[0].id
+        destination = self.library.suggest_destination(kind, req.root_id, rel_dir=req.rel_dir)
+        root_id = destination.root_id
         root_path = self.library.root_path(root_id)
-        rel = req.rel_dir if req.rel_dir is not None else self.library.default_dest(root_id, kind)
+        rel = req.rel_dir if req.rel_dir is not None else destination.rel_dir
         return root_id, to_rel(root_path, resolve_in_root(root_path, rel)) if rel else "", resolve_in_root(root_path, rel)
 
     def create(self, req: DownloadCreate) -> DownloadJob:

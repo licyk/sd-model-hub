@@ -442,6 +442,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/library/destination": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest Destination */
+        get: operations["suggest_download_destination"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/library/roots": {
         parameters: {
             query?: never;
@@ -858,6 +875,16 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** DownloadDestination */
+        DownloadDestination: {
+            /** Root Id */
+            root_id: string;
+            /**
+             * Rel Dir
+             * @default
+             */
+            rel_dir: string;
+        };
         /** DownloadFailedEvent */
         DownloadFailedEvent: {
             job: components["schemas"]["DownloadJob"];
@@ -980,6 +1007,10 @@ export interface components {
             /** Kind Folders */
             kind_folders: {
                 [key: string]: string;
+            };
+            /** Kind Destinations */
+            kind_destinations: {
+                [key: string]: components["schemas"]["DownloadDestination"] | null;
             };
             /**
              * Save Preview
@@ -1425,6 +1456,8 @@ export interface components {
              * @enum {string}
              */
             layout: "comfyui" | "sd-webui" | "custom";
+            /** Kind */
+            kind: string | null;
         };
         /** ModelStats */
         ModelStats: {
@@ -1671,6 +1704,8 @@ export interface components {
              * @enum {string}
              */
             layout: "comfyui" | "sd-webui" | "custom";
+            /** Kind */
+            kind?: string | null;
         };
         /** RootInfo */
         RootInfo: {
@@ -1687,6 +1722,8 @@ export interface components {
             layout: "comfyui" | "sd-webui" | "custom";
             /** Exists */
             exists: boolean;
+            /** Kind */
+            kind: string | null;
         };
         /** RootUpdate */
         RootUpdate: {
@@ -1696,6 +1733,8 @@ export interface components {
             path?: string | null;
             /** Layout */
             layout?: ("comfyui" | "sd-webui" | "custom") | null;
+            /** Kind */
+            kind?: string | null;
         };
         /** ScanResult */
         ScanResult: {
@@ -3359,6 +3398,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DownloadJob"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_download_destination: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                root_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadDestination"];
                 };
             };
             /** @description Bad Request */

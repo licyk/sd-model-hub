@@ -26,12 +26,18 @@ from sd_model_hub.core.library.models import (
 )
 from sd_model_hub.core.library.thumbnails import thumbnail
 from sd_model_hub.core.record import Record
+from sd_model_hub.core.settings.models import DownloadDestination
 
 router = APIRouter(prefix="/v1/library", tags=["library"], responses=ERROR_RESPONSES)
 
 
 class ScanResult(Record):
     started: bool
+
+
+@router.get("/destination", operation_id="suggest_download_destination")
+def suggest_destination(services: ServicesDep, kind: str | None = None, root_id: str | None = None) -> DownloadDestination:
+    return services.library.suggest_destination(kind, root_id)
 
 
 @router.get("/roots", operation_id="list_roots")

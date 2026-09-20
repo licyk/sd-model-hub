@@ -38,6 +38,7 @@ from sd_model_hub.core.library.models import (
 from sd_model_hub.core.library.previews import ScannedModel, companions_of, find_preview, is_ignored, model_stem, scan_dir
 from sd_model_hub.core.library.safety import escapes_root, resolve_in_root, to_rel, unique_path, validate_name
 from sd_model_hub.core.settings import ModelRoot, SettingsService
+from sd_model_hub.core.settings.models import DownloadDestination
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ class LibraryService:
 
     @staticmethod
     def _info(root: ModelRoot) -> RootInfo:
-        return RootInfo(id=root.id, name=root.name, path=root.path, layout=root.layout, exists=Path(root.path).expanduser().is_dir())
+        return RootInfo(id=root.id, name=root.name, path=root.path, layout=root.layout, exists=Path(root.path).expanduser().is_dir(), kind=root.kind)
 
     def list_roots(self) -> list[RootInfo]:
         return [self._info(r) for r in self._roots()]
@@ -136,7 +137,7 @@ class LibraryService:
         if self.roots_locked:
             raise ConflictError("The model folders are fixed by the application that started SD Model Hub and cannot be changed here.")
 
-    def add_root(self, req: RootCreate) -> RootInfo:
+    def add_root(self, req: RootCreate, *, root_id: str | None = None) -> RootInfo:
         self._check_roots_unlocked()
         path = Path(req.path).expanduser()
         if not path.is_absolute():
@@ -145,9 +146,11 @@ class LibraryService:
         if not path.is_dir():
             raise NotFoundError(f"Not a directory: {path}")
         for existing in self._roots():
+            if root_id is not None and existing.id == root_id:
+                raise ConflictError(f"Already a root with id {root_id!r}")
             if Path(existing.path).expanduser().resolve() == path:
                 raise ConflictError(f"Already a root: {path}", {"root_id": existing.id})
-        root = ModelRoot(id=uuid.uuid4().hex[:8], name=req.name or path.name or str(path), path=str(path), layout=req.layout)
+        root = ModelRoot(id=root_id or uuid.uuid4().hex[:8], name=req.name or path.name or str(path), path=str(path), layout=req.layout, kind=req.kind)
 
         def add(data: dict[str, Any]) -> None:
             data["paths"]["model_roots"].append(root.model_dump())
@@ -159,6 +162,8 @@ class LibraryService:
         self._check_roots_unlocked()
         self._root(root_id)
         changes = req.model_dump(exclude_none=True)
+        if "kind" in req.model_dump(exclude_unset=True):
+            changes["kind"] = req.kind
         if "path" in changes:
             path = Path(changes["path"]).expanduser()
             if not path.is_absolute() or not path.is_dir():
@@ -209,10 +214,37 @@ class LibraryService:
     def default_dest(self, root_id: str, kind: str | None) -> str:
         """The relative folder where a model of ``kind`` goes in this root."""
         root = self._root(root_id)
+        destination = self.settings.settings.downloads.kind_destinations.get(kind or "")
+        if destination is not None and destination.root_id == root_id:
+            return destination.rel_dir
         configured = self.settings.settings.downloads.kind_folders.get(kind or "")
         if configured:
             return configured
         return default_folder(root.layout, self.root_path(root_id), kind or "") if kind else ""
+
+    def suggest_destination(self, kind: str | None = None, root_id: str | None = None, *, rel_dir: str | None = None) -> DownloadDestination:
+        """Resolve the same default for API, CLI and UI without creating directories.
+
+        An explicit root wins, followed by the kind mapping, the default root, a root whose
+        hint matches the kind, then the first root. Invalid configured roots fail visibly.
+        """
+        downloads = self.settings.settings.downloads
+        configured = downloads.kind_destinations.get(kind or "")
+        if root_id is None:
+            root_id = configured.root_id if configured is not None else downloads.default_root
+        if root_id is None:
+            roots = self.list_roots()
+            if not roots:
+                raise ValidationError("No destination: add a model root, or give a destination folder")
+            root_id = next((r.id for r in roots if kind and r.kind == kind), roots[0].id)
+        root_path = self.root_path(root_id)
+        rel = self.default_dest(root_id, kind) if rel_dir is None else rel_dir
+        target = resolve_in_root(root_path, rel)
+        return DownloadDestination(root_id=root_id, rel_dir=to_rel(root_path, target))
+
+    @staticmethod
+    def _folder_kind(root: ModelRoot, rel_path: str) -> str | None:
+        return folder_kind(root.layout, rel_path) or root.kind
 
     def notify_changed(self, root_id: str, rel_path: str) -> None:
         self.events.publish(LibraryChangedEvent(root_id=root_id, rel_path=rel_path))
@@ -238,7 +270,7 @@ class LibraryService:
         st = path.stat()
         size = st.st_size if not scanned.is_dir else sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
         rel = to_rel(root_path, path)
-        fkind = folder_kind(root.layout, to_rel(root_path, path.parent))
+        fkind = self._folder_kind(root, to_rel(root_path, path.parent))
         detection = None
         pending = False
         if detect == "full":
@@ -291,14 +323,14 @@ class LibraryService:
                 continue
             models.append(entry)
         folders = [
-            FolderEntry(name=p.name, path=to_rel(root_path, p), folder_kind=folder_kind(root.layout, to_rel(root_path, p)))
+            FolderEntry(name=p.name, path=to_rel(root_path, p), folder_kind=self._folder_kind(root, to_rel(root_path, p)))
             for p in scanned.folders
             if self._folder_allowed(root_path, p)
         ]
         rel = to_rel(root_path, target)
         if pending and detect == "cached":
             self.scan_in_background(root_id, rel)
-        return FolderListing(root_id=root_id, path=rel, folder_kind=folder_kind(root.layout, rel), folders=folders, models=models, pending_detection=pending)
+        return FolderListing(root_id=root_id, path=rel, folder_kind=self._folder_kind(root, rel), folders=folders, models=models, pending_detection=pending)
 
     def _folder_allowed(self, root_path: Path, folder: Path) -> bool:
         """Hide a symlinked folder that leaves the root while symlinks are not followed.
@@ -347,7 +379,7 @@ class LibraryService:
 
         def build(path: Path, depth: int) -> TreeNode:
             rel = to_rel(root_path, path)
-            node = TreeNode(name=path.name if rel else root.name, path=rel, folder_kind=folder_kind(root.layout, rel))
+            node = TreeNode(name=path.name if rel else root.name, path=rel, folder_kind=self._folder_kind(root, rel))
             key = self._dir_id(path)
             if depth >= max_depth or (key is not None and key in seen):
                 return node

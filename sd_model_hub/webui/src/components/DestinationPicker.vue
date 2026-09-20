@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { useMeta, useSettings } from '@/api/queries/app';
-import { useRoots, useTree } from '@/api/queries/library';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { api, unwrap } from '@/api/client';
+import { useRoots } from '@/api/queries/library';
 import { useI18n } from '@/i18n';
-import { usePreferencesStore } from '@/stores/preferences';
 import { AppButton, AppDialog, Checkbox, PathField, SelectField, TextField } from '@/ui';
 
 export interface Destination {
@@ -18,53 +17,64 @@ const props = defineProps<{ kind?: string | null; fileLabel?: string | null; loa
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ confirm: [Destination] }>();
 const { t } = useI18n();
-const prefs = usePreferencesStore();
 const roots = useRoots();
-const meta = useMeta();
-const settings = useSettings();
 
 const rootId = ref<string | null>(null);
 const relDir = ref('');
 const absolute = ref('');
 const overwrite = ref(false);
-const tree = useTree(rootId);
+const suggesting = ref(false);
+const error = ref('');
+let requestId = 0;
+const edited = ref(false);
+onBeforeUnmount(() => requestId++);
 
 const rootOptions = computed(() => [...(roots.data.value ?? []).map((r) => ({ value: r.id, label: r.name })), { value: '__abs__', label: t('dest.absolute') }]);
-const root = computed(() => roots.data.value?.find((r) => r.id === rootId.value));
-
-/** The first folder of the layout that maps to the kind, preferring one that exists. */
-const suggested = computed(() => {
-  const kind = props.kind;
-  const layout = root.value?.layout;
-  if (!kind || !layout) return '';
-  const configured = settings.data.value?.downloads.kind_folders?.[kind];
-  if (configured) return configured;
-  const mapping = meta.data.value?.layouts[layout] ?? {};
-  const candidates = Object.entries(mapping).filter(([, k]) => k === kind).map(([folder]) => folder);
-  const existing = new Set<string>();
-  const walk = (node: { path: string; children?: { path: string; children?: unknown[] }[] }, depth: number) => {
-    existing.add(node.path);
-    if (depth < 2) for (const c of node.children ?? []) walk(c as never, depth + 1);
-  };
-  if (tree.data.value) walk(tree.data.value as never, 0);
-  return candidates.find((c) => existing.has(c)) ?? candidates.find((c) => !c.startsWith('models/')) ?? candidates[0] ?? '';
-});
-
-watch(open, (v) => {
-  if (!v) return;
-  const list = roots.data.value ?? [];
-  const preferred = settings.data.value?.downloads.default_root ?? prefs.prefs.lastRoot;
-  rootId.value = list.find((r) => r.id === preferred)?.id ?? list[0]?.id ?? '__abs__';
+watch([open, () => props.kind], () => {
+  requestId++;
+  rootId.value = null;
+  relDir.value = '';
+  edited.value = false;
+  error.value = '';
   overwrite.value = false;
-});
-watch([suggested, open], () => {
-  if (open.value) relDir.value = [suggested.value, props.defaultSubfolder].filter(Boolean).join('/');
-});
+}, { immediate: true });
+
+watch([open, rootId, () => props.kind, () => roots.data.value], async () => {
+  const id = ++requestId;
+  suggesting.value = false;
+  error.value = '';
+  if (!open.value || !roots.data.value || rootId.value === '__abs__') return;
+  if (!roots.data.value.length) {
+    rootId.value = '__abs__';
+    return;
+  }
+  suggesting.value = true;
+  try {
+    const destination = await unwrap(api.GET('/api/v1/library/destination', {
+      params: { query: { kind: props.kind ?? undefined, root_id: rootId.value ?? undefined } },
+    }));
+    if (id !== requestId) return;
+    rootId.value = destination.root_id;
+    if (!edited.value) relDir.value = [destination.rel_dir, props.defaultSubfolder].filter(Boolean).join('/');
+  } catch (e) {
+    if (id === requestId) error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    if (id === requestId) suggesting.value = false;
+  }
+}, { immediate: true });
+
+function chooseRoot(value: string | null) {
+  edited.value = false;
+  rootId.value = value;
+}
 
 function confirm() {
+  if (!canConfirm.value) return;
   if (rootId.value === '__abs__') emit('confirm', { dest_dir: absolute.value.trim(), overwrite: overwrite.value });
   else emit('confirm', { root_id: rootId.value, rel_dir: relDir.value.trim(), overwrite: overwrite.value });
 }
+
+const canConfirm = computed(() => !!rootId.value && !error.value && !suggesting.value && !props.loading && (rootId.value !== '__abs__' || !!absolute.value.trim()));
 </script>
 
 <template>
@@ -72,15 +82,15 @@ function confirm() {
     <div class="form">
       <p v-if="fileLabel" class="type-body-medium muted file">{{ t('dest.fileName') }}: {{ fileLabel }}</p>
       <p v-if="!roots.data.value?.length" class="type-body-medium muted">{{ t('dest.noRoots') }}</p>
-      <SelectField v-model="rootId" :label="t('dest.root')" :options="rootOptions" />
+      <SelectField :model-value="rootId" :label="t('dest.root')" :options="rootOptions" @update:model-value="chooseRoot" />
       <PathField v-if="rootId === '__abs__'" v-model="absolute" :label="t('dest.absolute')" />
-      <TextField v-else v-model="relDir" :label="t('dest.folder')" :supporting-text="t('dest.folderHelp')" @enter="confirm" />
+      <TextField v-else v-model="relDir" :label="t('dest.folder')" :supporting-text="t('dest.folderHelp')" :error-text="error || undefined" @update:model-value="edited = true" @enter="confirm" />
       <Checkbox v-model="overwrite" :label="t('dest.overwrite')" />
       <slot />
     </div>
     <template #actions>
       <AppButton variant="text" @click="open = false">{{ t('common.cancel') }}</AppButton>
-      <AppButton :loading="loading" :disabled="rootId === '__abs__' && !absolute.trim()" @click="confirm">{{ t('dest.queue') }}</AppButton>
+      <AppButton :loading="loading || suggesting" :disabled="!canConfirm" @click="confirm">{{ t('dest.queue') }}</AppButton>
     </template>
   </AppDialog>
 </template>

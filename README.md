@@ -104,16 +104,85 @@ hub.stop()
 | --- | --- |
 | `data_dir` | Where the database, caches and (by default) the settings file live |
 | `settings_path` | The settings file on its own, apart from `data_dir` |
-| `model_roots` | Folders of models, each with its own `layout`: `comfyui`, `sd-webui` or `custom` |
+| `model_roots` | Folders of models, each with its own `layout` and optional `kind` hint; supply an `id` to reference it in download settings |
 | `lock_model_roots` | Fixes them: the API refuses changes and the interface hides those actions |
 | `port` | `0` any free port, a number for that one (moving up unless `strict_port`), `None` for the configured one |
 | `api_prefix` | Serves the API, the socket and the web UI under one path |
+| `public_base_url` | Trusted browser-facing UI URL, including any proxy path, for OAuth callbacks and cookies; does not change routing |
 | `settings` | Pins any other setting, e.g. `{"downloads": {"verify_hash": False}}`; pinned values cannot be changed in the UI |
 | `host`, `access_token`, `open_browser`, `log_level` | As for the command line; a non-loopback host requires a token |
 
 `hub.start()` is non-blocking and returns the URL; `hub.run()` serves in the foreground;
 `with ModelHubServer(...) as hub:` does both ends. `hub.services` exposes the library, downloads
 and settings for direct use, and `hub.url`, `hub.port` and `hub.running` describe the server.
+
+Dedicated directories can live on different disks. For example, a host can supply
+`ModelRoot("/models/lora", id="host-lora", kind="lora")` and pin the following settings:
+
+```python
+settings={
+    "downloads": {
+        "kind_destinations": {
+            "lora": {"root_id": "host-lora", "rel_dir": ""},
+        },
+    },
+}
+```
+
+`kind` is only a fallback folder hint: a layout's specific folder mapping takes precedence,
+and file detection is still reported independently, including mismatches. It also helps choose
+a default download root when no explicit default is configured. Host root IDs are preserved
+when seeded into settings; omitted IDs are derived deterministically from the resolved path.
+
+Download destination precedence is: an explicit destination/root, then the model kind's
+`kind_destinations` entry, then `default_root`, then a root with the matching kind hint, then
+the first root. An explicit relative directory, including `""`, wins over suggestions. Within
+the selected root, a matching kind destination wins over the legacy `kind_folders` mapping
+and the layout default. A missing configured root or an escaping relative path raises an error
+instead of silently downloading elsewhere. Set an individual kind destination to `null` via
+the settings API to clear it. Root locking fixes the root list; it does not disable absolute
+download destinations or server-side imports.
+
+The UI and download manager both use `LibraryService.suggest_destination(kind, root_id)`;
+it is also available as `GET /api/v1/library/destination?kind=lora&root_id=...` (both parameters
+are optional). Suggestions do not create directories.
+
+For a host that already has an ASGI server, use the same Python environment and mount the
+app directly; no extra listener or subprocess is needed:
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from sd_model_hub.api.app import create_app
+from sd_model_hub.core.context import build_services
+
+services = build_services(data_dir=..., settings_overrides=..., roots_locked=True)
+hub_app = create_app(services, bound_host="127.0.0.1")
+
+@asynccontextmanager
+async def lifespan(app):
+    try:
+        async with hub_app.router.lifespan_context(hub_app):
+            yield
+    finally:
+        services.close()
+
+app = FastAPI(lifespan=lifespan)
+app.mount("/model-hub", hub_app)
+```
+
+The host must enter and exit the child lifespan on the serving event loop; mounting alone
+does not start the download queue or event bridge. If the host is already running when it
+loads an extension, enter that context explicitly on its existing loop and retain it until
+unload/shutdown. Apply the host's authentication to both HTTP and WebSocket requests through
+the mounted application; a host's route dependencies do not automatically protect a child
+app. Keep origin checks and configure the intended host names (`extra_hosts` in `create_app`).
+
+Mount paths, `root_path` and `api_prefix` contribute to OAuth cookie and redirect paths.
+With a reverse proxy, `public_base_url="https://example.com/webui/model-hub"` sets the trusted
+external UI URL. Its callback must also appear in `auth.civitai.redirect_uris` when that
+allowlist is configured, and must be registered with the provider. Forwarded headers alone
+cannot choose a callback URL. A manual source token continues to work without OAuth setup.
 
 The command line can also take the prefix: `sd-model-hub webui --api-prefix /tools/model-hub`.
 

@@ -425,6 +425,17 @@ How each part works, so it stays that way:
   prefix, and the OAuth redirect and callback URL include it.
 - **Lifecycle.** `start()` runs uvicorn in a thread and waits for `server.started`; `stop()` sets
   `should_exit`, joins, closes the socket and the services, and is safe to call twice.
+- **Host directories.** Roots may carry a `kind` fallback hint; layout mappings and detected
+  file kinds remain separate. `downloads.kind_destinations` selects a root and relative folder
+  per kind. UI suggestions and downloads share `LibraryService.suggest_destination`; explicit
+  destinations win and invalid configured targets fail rather than falling back. Explicit host
+  IDs survive seeding, and generated host IDs must not depend on Python's randomized `hash()`.
+- **Direct ASGI embedding.** A host can mount `create_app(services)` without another listener.
+  It owns entering/exiting the child lifespan on its event loop and closing the services, and
+  must protect both HTTP and WebSocket access using its own authentication. Mounted security
+  and Socket.IO paths account for both old and new Starlette mount semantics. `public_base_url`
+  is a trusted host-supplied external UI URL for OAuth behind a proxy, not a routing prefix.
+  OAuth binding cookies, callbacks and return paths share the same public deployment prefix.
 
 ## 13. Testing
 

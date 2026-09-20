@@ -13,6 +13,7 @@ from fastapi.responses import RedirectResponse
 
 from sd_model_hub.api.deps import ServicesDep
 from sd_model_hub.api.errors import ERROR_RESPONSES
+from sd_model_hub.api.paths import public_prefix
 from sd_model_hub.core.auth.models import AuthStart, CivitaiAuthStatus, MethodRequest, StartRequest
 from sd_model_hub.core.errors import ModelHubError, ValidationError
 
@@ -31,12 +32,18 @@ def callback_url(request: Request, services: ServicesDep) -> str:
     The address is never taken from the Host header or forwarding headers: a callback has to
     match one registered with Civitai exactly, and an attacker must not be able to choose it.
     """
-    prefix = getattr(request.app.state, "api_prefix", "") or ""
-    path = f"{prefix}{CALLBACK_PATH}"
+    base = getattr(request.app.state, "public_base_url", None)
     allowed = services.settings.settings.auth.civitai.redirect_uris
+    if base:
+        callback = f"{base}{CALLBACK_PATH}"
+        if allowed and callback not in allowed:
+            raise ValidationError("public_base_url does not match a registered auth.civitai.redirect_uris callback")
+        return callback
+    prefix = public_prefix(request)
+    path = f"{prefix}{CALLBACK_PATH}"
     if allowed:
         origin = f"{request.url.scheme}://{request.url.netloc}"
-        match = next((uri for uri in allowed if uri.startswith(origin) and urlsplit(uri).path == path), None)
+        match = next((uri for uri in allowed if (urlsplit(uri).scheme, urlsplit(uri).netloc) == (request.url.scheme, request.url.netloc) and urlsplit(uri).path == path), None)
         if match is None:
             raise ValidationError(
                 f"No callback is registered for {origin}. Add the exact URL to auth.civitai.redirect_uris and register it with Civitai, or use a manual API token."
@@ -45,6 +52,8 @@ def callback_url(request: Request, services: ServicesDep) -> str:
     host = services.settings.settings.server.host
     port = getattr(request.app.state, "bound_port", None) or services.settings.settings.server.port
     host = "127.0.0.1" if host in ("0.0.0.0", "::", "localhost") else host
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
     return f"http://{host}:{port}{path}"
 
 
@@ -62,8 +71,8 @@ def start(request: Request, response: Response, services: ServicesDep, body: Sta
         httponly=True,
         samesite="lax",
         # Set only over HTTPS: a loopback deployment is plain HTTP and would drop the cookie.
-        secure=request.url.scheme == "https",
-        path="/api/v1/auth/civitai",
+        secure=urlsplit(getattr(request.app.state, "public_base_url", None) or str(request.url)).scheme == "https",
+        path=f"{public_prefix(request)}/api/v1/auth/civitai",
     )
     return start_result
 
@@ -89,12 +98,12 @@ def callback(
         except ModelHubError as e:
             logger.info("Completing the Civitai authorization failed: %s", e)
 
-    prefix = getattr(request.app.state, "api_prefix", "") or ""
+    prefix = public_prefix(request)
     if prefix and target.startswith("/") and not target.startswith(f"{prefix}/"):
         target = f"{prefix}{target}"
     separator = "&" if "?" in target else "?"
     response = RedirectResponse(f"{target}{separator}civitai={status}", status_code=303)
-    response.delete_cookie(BINDING_COOKIE, path="/api/v1/auth/civitai")
+    response.delete_cookie(BINDING_COOKIE, path=f"{prefix}/api/v1/auth/civitai")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sd_model_hub.api.errors import install_error_handlers
 from sd_model_hub.api.openapi import ModelHubAPI
+from sd_model_hub.api.paths import validate_public_base_url
 from sd_model_hub.api.routers import app_info, auth, downloads, hubs, library, settings, sources
 from sd_model_hub.api.security import SecurityMiddleware
 from sd_model_hub.api.sockets import SocketBridge
@@ -33,6 +34,7 @@ def create_app(
     start_downloads: bool = True,
     serve_ui: bool = True,
     api_prefix: str | None = None,
+    public_base_url: str | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -40,8 +42,13 @@ def create_app(
     under one path, so a host application can mount it beside its own routes without a clash.
     The web UI needs no change: it derives its base URL from the URL its own script was loaded
     from, which already carries the prefix.
+
+    When mounted, the host must enter this app's ``router.lifespan_context`` on its serving
+    event loop and close the services afterwards. ``public_base_url`` supplies a trusted
+    browser-facing URL for OAuth behind a proxy; it does not add a second route prefix.
     """
     prefix = normalize_prefix(api_prefix)
+    public_base_url = validate_public_base_url(public_base_url)
     socket_bridge = SocketBridge(services.events, lambda: services.settings.settings.server.access_token)
 
     @asynccontextmanager
@@ -59,6 +66,7 @@ def create_app(
     app.state.services = services
     app.state.bound_port = bound_port
     app.state.api_prefix = prefix
+    app.state.public_base_url = public_base_url
     install_error_handlers(app)
 
     for module in (app_info, settings, auth, sources, hubs, downloads, library):

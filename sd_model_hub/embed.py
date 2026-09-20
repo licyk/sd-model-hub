@@ -18,6 +18,7 @@
 ``hub.services`` exposes the library, downloads and settings for direct use.
 """
 
+import hashlib
 import logging
 import socket
 import threading
@@ -43,20 +44,24 @@ class ModelRoot:
     ``layout`` decides which folder holds which kind of model: ``comfyui`` (``checkpoints``,
     ``loras``, ``vae``, …), ``sd-webui`` (``models/Stable-diffusion``, ``models/Lora``, …, with
     ``embeddings`` beside ``models``), or ``custom`` for no mapping at all.
+    ``kind`` supplies a fallback folder hint for a dedicated directory. An explicit ``id``
+    remains stable across restarts; otherwise one is derived from the resolved path.
     """
 
     path: str | Path
     layout: LayoutName = "custom"
     name: str | None = None
     id: str | None = None
+    kind: str | None = None
 
     def to_settings(self) -> dict[str, Any]:
         path = Path(self.path).expanduser().resolve()
         return {
-            "id": self.id or f"host-{abs(hash(str(path))) % 10**8:08d}",
+            "id": self.id or f"host-{hashlib.sha256(str(path).encode()).hexdigest()[:16]}",
             "name": self.name or path.name or str(path),
             "path": str(path),
             "layout": self.layout,
+            "kind": self.kind,
         }
 
 
@@ -74,6 +79,7 @@ class ModelHubServer:
         port: int | None = None,
         strict_port: bool = False,
         api_prefix: str | None = None,
+        public_base_url: str | None = None,
         open_browser: bool = False,
         access_token: str | None = None,
         settings: dict[str, Any] | None = None,
@@ -94,6 +100,9 @@ class ModelHubServer:
         ``api_prefix`` moves the API, the socket and the web UI under one path, so they cannot
         collide with the host application's own routes.
 
+        ``public_base_url`` is the trusted external URL of the UI, including any deployment
+        path, used for OAuth callbacks and cookies behind a proxy. It does not change routing.
+
         ``settings`` pins any other setting, in the same shape as the settings file, for example
         ``{"downloads": {"verify_hash": False}}``. Pinned values cannot be changed through the UI.
         """
@@ -101,6 +110,7 @@ class ModelHubServer:
         self.settings_path = Path(settings_path).expanduser() if settings_path else None
         self.lock_model_roots = lock_model_roots
         self.api_prefix = api_prefix or ""
+        self.public_base_url = public_base_url
         self.open_browser = open_browser
         self.strict_port = strict_port
         self._requested_port = port
@@ -118,7 +128,7 @@ class ModelHubServer:
             overrides["server"] = server_overrides
         # Locked roots are an override, so they cannot be edited or lost; unlocked ones are a
         # starting point the user may add to, so they are saved normally at start-up.
-        if roots and lock_model_roots:
+        if model_roots is not None and lock_model_roots:
             overrides["paths"] = {**(overrides.get("paths") or {}), "model_roots": [r.to_settings() for r in roots]}
         self._roots = roots
         self._overrides = overrides
@@ -153,7 +163,8 @@ class ModelHubServer:
             if Path(spec["path"]).resolve() in known:
                 continue
             try:
-                services.library.add_root(RootCreate(name=spec["name"], path=spec["path"], layout=spec["layout"]))
+                services.library.add_root(RootCreate(name=spec["name"], path=spec["path"], layout=spec["layout"], kind=spec["kind"]), root_id=spec["id"])
+                known.add(Path(spec["path"]).resolve())
             except ModelHubError as e:
                 logger.warning("Could not add the model folder %s: %s", spec["path"], e)
 
@@ -170,7 +181,7 @@ class ModelHubServer:
         from sd_model_hub.api.app import create_app
 
         host = services.settings.settings.server.host
-        return create_app(services, bound_host=host, bound_port=port, api_prefix=self.api_prefix)
+        return create_app(services, bound_host=host, bound_port=port, api_prefix=self.api_prefix, public_base_url=self.public_base_url)
 
     def start(self, timeout: float = START_TIMEOUT) -> str:
         """Start serving in a background thread and return the URL of the web UI."""
