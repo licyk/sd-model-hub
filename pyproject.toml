@@ -35,7 +35,7 @@ dependencies = [
     "modelscope",
     "typer>=0.26.7",
     "rich",
-    "Pillow>=10.0",
+    "Pillow",
     "send2trash",
     "tomli-w",
     "tomli; python_version < '3.11'",

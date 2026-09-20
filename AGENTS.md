@@ -235,6 +235,10 @@ never silently repeats a download.
 
 **HTTP downloads** (`downloads/http_downloader.py`):
 
+The shared client in `core/net/http.py` inspects the HTTPX constructor to select `proxies`
+for older releases such as 0.24.1 and `proxy` when supported (0.26+); 0.28 removed `proxies`.
+Keep both parameter paths covered when changing proxy setup.
+
 1. Resolve the URL immediately before each attempt — Civitai's links expire.
 2. Stream into `<name>.part`, following redirects; take the name from `Content-Disposition` and
    sanitise it.
@@ -461,8 +465,9 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - hf-mirror and Gitee AI endpoints were never tested from a network that needs them.
 - Drag-and-drop upload is covered at the API level, not by dropping a file in a real browser.
 - The Windows credential store, and the app on Windows generally, is untested.
-- **Before the first release:** the project has no LICENSE file and no `license` or `urls`
-  metadata, and publishing needs the `TWINE_PASSWORD` secret plus the `pypi` environment. The
+- The root `LICENSE` is the GPLv3 text copied from `sd-webui-all-in-one`.
+- **Before the first release:** the project has no `license` or `urls` metadata, and publishing
+  needs the `TWINE_PASSWORD` secret plus the `pypi` environment. The
   name `sd-model-hub` was free on PyPI when last checked.
 - "Select similar models" from the original plan is implemented as filters for kind and base
   model; nobody has confirmed that is what was meant.

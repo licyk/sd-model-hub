@@ -1,6 +1,8 @@
 """A shared httpx client that follows the network settings."""
 
+import inspect
 import threading
+from typing import Any
 
 import httpx
 
@@ -23,9 +25,12 @@ class HttpClientProvider:
         key = (net.proxy, net.timeout)
         with self._lock:
             if self._client is None or key != self._key:
+                # HTTPX added proxy in 0.26 and removed the older proxies spelling in 0.28.
+                proxy_parameter = "proxy" if "proxy" in inspect.signature(httpx.Client).parameters else "proxies"
+                proxy_options: dict[str, Any] = {proxy_parameter: net.proxy or None}
                 # A replaced client is not closed here: running jobs may still hold it.
                 self._client = httpx.Client(
-                    proxy=net.proxy or None,
+                    **proxy_options,
                     timeout=httpx.Timeout(net.timeout, connect=min(net.timeout, 15.0)),
                     follow_redirects=True,
                     headers={"User-Agent": f"sd-model-hub/{VERSION}"},
