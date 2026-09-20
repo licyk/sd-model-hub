@@ -100,6 +100,10 @@ For a version change, bump `VERSION`, commit and push to `main`. Python 3.10 is 
 - **Python types:** ty checks `sd_model_hub`, excluding the generated web UI and its dependencies.
   It targets Python 3.10 locally; CI overrides the target for each Python matrix entry.
   `typecheck-py` passes its own interpreter with `--python` so dependencies resolve consistently.
+  The `dev` extra includes `keyring` for the optional credential-store import and `tomli` for
+  checking the Python 3.10 fallback on newer hosts. Runtime dependencies keep their optional
+  or version-specific behavior. Verify dependency fixes in an isolated environment, since a
+  shared interpreter can hide undeclared packages.
 - **Comments explain why, never what.** Do not narrate the diff or leave "changed X" notes.
 - **Docstrings** on modules and non-obvious functions; one line where one line does.
 - **Use the file tools to edit code.** A scripted mass rewrite (sed and friends) needs the user's

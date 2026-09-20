@@ -42,7 +42,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "ty"]
+# ty resolves the optional credential store and the Python 3.10 TOML fallback on every host.
+dev = ["keyring", "pytest", "ruff", "tomli", "ty"]
 
 [project.scripts]
 "sd-model-hub" = "sd_model_hub.cli.app:main"
