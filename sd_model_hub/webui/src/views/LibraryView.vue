@@ -60,10 +60,20 @@ const path = ref(str(route.query.path) ?? '');
 const kind = ref<string | null>(null);
 const direction = ref(1);
 
+/**
+ * A root with no kind hint holds a whole model directory; one with a hint is dedicated to a
+ * single kind. An embedding host seeds both, so the complete directory leads the list and is
+ * what this view opens on. Roots keep their configured order otherwise.
+ */
+const sortedRoots = computed(() => {
+  const list = roots.data.value ?? [];
+  return [...list.filter((r) => !r.kind), ...list.filter((r) => r.kind)];
+});
+
 watch(
-  () => roots.data.value,
+  sortedRoots,
   (list) => {
-    if (!list) return;
+    if (!roots.data.value) return;
     if (!list.some((r) => r.id === rootId.value)) {
       rootId.value = list[0]?.id ?? null;
       path.value = '';
@@ -91,7 +101,7 @@ const entries = useEntries(rootId, path, kind);
 const tree = useTree(rootId);
 const root = computed(() => roots.data.value?.find((r) => r.id === rootId.value) ?? null);
 const listing = computed(() => entries.data.value);
-const rootOptions = computed(() => (roots.data.value ?? []).map((r) => ({ value: r.id, label: r.name })));
+const rootOptions = computed(() => sortedRoots.value.map((r) => ({ value: r.id, label: r.name })));
 const kindOptions = computed(() => [{ value: '', label: t('browse.allKinds') }, ...(meta.data.value?.kinds ?? []).map((k) => ({ value: k, label: kindLabel(k) }))]);
 const crumbs = computed(() => [{ label: root.value?.name ?? '', value: '' }, ...pathSegments(path.value).map((s) => ({ label: s.name, value: s.path }))]);
 

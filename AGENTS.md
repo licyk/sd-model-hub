@@ -483,6 +483,9 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - An anchored menu renders at the end of the document, never inside a card or row that clips it.
 - Library kind filters apply to models, while folders remain visible for navigation. Hosts that
   expose an entire model directory must register that directory explicitly as a root with no kind hint.
+  The Library lists roots without a kind hint before the ones dedicated to a single kind, keeping
+  the configured order within each group, and opens on the first: with a host that seeds a folder
+  per kind, the complete model directory leads the list and is what the screen shows first.
 
 ## 15. Known gaps
 
