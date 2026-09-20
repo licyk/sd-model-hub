@@ -8,8 +8,8 @@ do not rely on anything outside it, and when you learn something durable, write 
 A tool for downloading and managing Stable Diffusion models, with two ends over one core:
 
 - **A command line** (`sd-model-hub`, Typer) that does everything, including starting the web UI.
-- **A web UI** (Vue 3, served by the same Python process) with four screens: Browse, Hubs,
-  Library, Settings.
+- **A web UI** (Vue 3, served by the same Python process) with five screens: Browse, Hubs,
+  Link, Library, Settings.
 
 What it does:
 
@@ -17,6 +17,9 @@ What it does:
   resume, SHA256 verification, preview images and metadata sidecars.
 - **Hubs:** download files or whole repositories from Hugging Face (and mirrors such as
   hf-mirror) and ModelScope, through their own libraries.
+- **Link:** download any http(s) address typed by hand into a folder chosen by hand — the
+  `url` form of a download job, with the optional file name and SHA256 the CLI's
+  `download url` takes.
 - **Library:** manage ComfyUI and Stable Diffusion WebUI model folders — identify each model's
   kind and base architecture from the file header, browse with previews, and import, move,
   rename and delete models together with their companion files.

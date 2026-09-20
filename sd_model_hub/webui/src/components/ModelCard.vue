@@ -67,5 +67,6 @@ defineExpose({ rect: () => card.value?.el?.getBoundingClientRect() ?? null });
 .list .body { align-items: center; padding: var(--app-space-1) var(--app-space-1) var(--app-space-1) var(--app-space-3); }
 .list .actions { flex-direction: row; align-items: center; }
 .list .badges { margin-top: 0; }
-.select-lead { display: flex; align-items: center; padding-left: var(--app-space-2); }
+/* Padded on both sides: against the thumbnail the dense checkbox reads as part of the picture. */
+.select-lead { display: flex; align-items: center; padding: 0 var(--app-space-3) 0 var(--app-space-2); }
 </style>

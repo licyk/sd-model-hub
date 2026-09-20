@@ -6,6 +6,8 @@ Download and manage Stable Diffusion models, from the command line or a web UI.
   checks, preview images and metadata sidecars.
 - **Hubs:** download files or whole repositories from Hugging Face (or a mirror such as
   hf-mirror) and ModelScope.
+- **Link:** paste any download address and choose the folder it goes to, with an optional
+  file name and SHA256 to check against.
 - **Library:** point SD Model Hub at your ComfyUI or Stable Diffusion WebUI model folders. It
   identifies each model's type and base model from the safetensors header (never unpickling
   anything), shows previews, and imports, moves, renames and deletes models together with

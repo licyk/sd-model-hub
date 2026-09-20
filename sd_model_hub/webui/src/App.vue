@@ -38,6 +38,7 @@ const activeCount = computed(() => (jobs.data.value ?? []).filter((j) => j.state
 const nav = computed<NavItem[]>(() => [
   { to: '/browse', label: t('nav.browse'), icon: icons.Search },
   { to: '/hubs', label: t('nav.hubs'), icon: icons.Box },
+  { to: '/direct', label: t('nav.direct'), icon: icons.Link },
   { to: '/library', label: t('nav.library'), icon: icons.Library },
   { to: '/settings', label: t('nav.settings'), icon: icons.Settings },
 ]);

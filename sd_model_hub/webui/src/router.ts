@@ -4,6 +4,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/browse' },
   { path: '/browse', name: 'browse', component: () => import('./views/BrowseView.vue') },
   { path: '/hubs', name: 'hubs', component: () => import('./views/HubsView.vue') },
+  { path: '/direct', name: 'direct', component: () => import('./views/DirectView.vue') },
   { path: '/library', name: 'library', component: () => import('./views/LibraryView.vue') },
   { path: '/settings', name: 'settings', component: () => import('./views/SettingsView.vue') },
 ];
