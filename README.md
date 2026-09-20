@@ -230,23 +230,22 @@ the files that exist when it runs; the server then logs a warning and serves the
 
 ## Releasing
 
-`.github/workflows/release.yml` publishes to PyPI when a version tag is pushed:
+`.github/workflows/release.yml` publishes to PyPI when a push to `main` changes
+`sd_model_hub/version.py`, when a `v*` tag is pushed, or through **Run workflow** in the Actions tab.
+For a version change on `main`:
 
 ```bash
 python scripts/dev.py check                 # first, locally
 # bump VERSION in sd_model_hub/version.py, commit
-git tag v0.1.0 && git push origin v0.1.0
+git push origin main
 ```
 
 The workflow runs the tests on Python 3.10 to 3.13, the web UI tests and type-check, and the
-generated-types check; then it verifies that the tag matches `sd_model_hub/version.py`, builds
+generated-types check; for tag runs it verifies that the tag matches `sd_model_hub/version.py`, then builds
 the wheel **with the web UI in it**, checks the wheel really contains the UI and the detection
 rules, installs it into a clean environment and runs `sd-model-hub version`. Only then does it
-publish and create the GitHub release with the built files attached.
-
-**Run workflow** in the Actions tab publishes to TestPyPI instead, so a release can be rehearsed.
+publish. Tag runs also create the GitHub release with the built files attached.
 
 Set-up, once: on PyPI add a *trusted publisher* for this repository with workflow
-`release.yml` and environment `pypi` (and the same on TestPyPI with environment `testpypi`),
-then create those two environments in the repository settings. No API token is stored anywhere;
-the environments can also require an approval before a release goes out.
+`release.yml` and environment `pypi`, then create that environment in the repository settings.
+No API token is stored anywhere; the environment can also require an approval before a release goes out.

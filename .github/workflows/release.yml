@@ -1,22 +1,13 @@
 name: Release
 
-# Publishing happens when a version tag is pushed:
-#
-#   python scripts/dev.py check          # locally, first
-#   git tag v0.1.0 && git push origin v0.1.0
-#
-# "Run workflow" publishes to TestPyPI instead, so a release can be rehearsed. Nothing is
-# published unless the checks, the tag and the version in sd_model_hub/version.py all agree.
+# Version changes on main, version tags and manual runs publish to PyPI after all checks pass.
+# Tag-triggered runs also verify the tag matches sd_model_hub/version.py.
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    paths: ['sd_model_hub/version.py']
   workflow_dispatch:
-    inputs:
-      target:
-        description: Where to publish
-        type: choice
-        options: [testpypi, pypi]
-        default: testpypi
 
 permissions:
   contents: read
@@ -139,13 +130,13 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish to ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'pypi' }}
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
     # The environment holds the trusted publisher and can require an approval before a release.
     environment:
-      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'pypi' }}
-      url: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi' && 'https://test.pypi.org/p/sd-model-hub' || 'https://pypi.org/p/sd-model-hub' }}
+      name: pypi
+      url: https://pypi.org/p/sd-model-hub
     permissions:
       # Trusted publishing: PyPI verifies this workflow's identity, so no API token is stored.
       id-token: write
@@ -157,7 +148,6 @@ jobs:
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi' && 'https://test.pypi.org/legacy/' || '' }}
           print-hash: true
 
   github-release:

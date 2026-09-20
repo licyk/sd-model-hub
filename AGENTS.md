@@ -52,7 +52,7 @@ list. Command functions in `cli/commands/` are plain and undecorated — importa
 without Typer — and their name and help text are given at registration, not taken from the
 function. `cli/factory.py` owns the shared settings and adds `--debug` at every level through
 custom command and group classes; it is the only module that may import the private
-`typer._click`, and `pyproject.toml` pins an upper bound on Typer because of it. `main()` does
+`typer._click`; Typer upgrades must remain compatible with this integration. `main()` does
 its own error handling so exit codes and messages are uniform. Heavy imports (FastAPI, uvicorn,
 the hub libraries) go inside the command functions, which keeps `sd-model-hub version` fast.
 
@@ -81,12 +81,13 @@ python scripts/build_wheel.py      # web UI, then wheel and sdist
 There is no Makefile on purpose: this project is developed on Windows as often as on Linux.
 The web UI uses **bun**. Always finish a change with `python scripts/dev.py check`.
 
-**Releasing** is `.github/workflows/release.yml`, on a `v*` tag: tests on Python 3.10–3.13, the
-web tests and type-check, the generated-types check, then the tag is compared with
+**Releasing** is `.github/workflows/release.yml`, on a push to `main` changing
+`sd_model_hub/version.py`, a `v*` tag, or a manual run: tests on Python 3.10–3.13, the
+web tests and type-check, the generated-types check, then any tag is compared with
 `sd_model_hub/version.py`, the wheel is built with the UI inside it and checked (UI present,
 rules present, installs, runs), and only then published to PyPI through a trusted publisher —
-no API token is stored. Running the workflow by hand publishes to TestPyPI instead. So: bump
-`VERSION`, commit, tag `vX.Y.Z`, push the tag. Python 3.10 is the floor, so `typing.Self`,
+no API token is stored. All triggers publish to PyPI; only tag runs create a GitHub release.
+For a version change, bump `VERSION`, commit and push to `main`. Python 3.10 is the floor, so `typing.Self`,
 `tomllib` without the `tomli` fallback and other 3.11+ APIs are out.
 
 ## 4. Conventions
@@ -313,6 +314,9 @@ says so while it applies.
 - The OpenAPI schema also carries the socket event models, so the UI types push and REST from one
   file. `scripts/generate_openapi.py` prints it without starting a server; the generated
   `schema.d.ts` is committed and `dev.py typegen-check` fails when it is stale.
+  FastAPI's built-in schemas also affect this file: 0.141.1 includes optional `input` and `ctx`
+  fields on `ValidationError` that 0.117.1 omits. When CI reports a generated-type diff, match
+  its FastAPI/Pydantic versions before regenerating; API code need not have changed.
 - Records that cross the boundary inherit `core/record.py`, which marks defaulted fields as
   required in the output schema so generated types match what the server actually sends.
 - **Uploads** (`PUT /api/v1/library/upload`) take the raw request body, not multipart, and stream
@@ -448,7 +452,7 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - Drag-and-drop upload is covered at the API level, not by dropping a file in a real browser.
 - The Windows credential store, and the app on Windows generally, is untested.
 - **Before the first release:** the project has no LICENSE file and no `license` or `urls`
-  metadata, and PyPI needs trusted publishers plus the `pypi` and `testpypi` environments. The
+  metadata, and PyPI needs a trusted publisher plus the `pypi` environment. The
   name `sd-model-hub` was free on PyPI when last checked.
 - "Select similar models" from the original plan is implemented as filters for kind and base
   model; nobody has confirmed that is what was meant.
