@@ -102,7 +102,7 @@ function navigate(to: string) {
 
 type Item = { type: 'folder'; folder: FolderEntry } | { type: 'model'; model: ModelEntry };
 const items = computed<Item[]>(() => [
-  ...(kind.value ? [] : (listing.value?.folders ?? []).map((folder) => ({ type: 'folder' as const, folder }))),
+  ...(listing.value?.folders ?? []).map((folder) => ({ type: 'folder' as const, folder })),
   ...(listing.value?.models ?? []).map((model) => ({ type: 'model' as const, model })),
 ]);
 const itemKey = (i: Item) => (i.type === 'folder' ? `f:${i.folder.path}` : `m:${i.model.path}`);

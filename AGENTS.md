@@ -471,6 +471,8 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - A host application's pinned settings and locked model folders cannot be overridden from the UI,
   the API or the command line.
 - An anchored menu renders at the end of the document, never inside a card or row that clips it.
+- Library kind filters apply to models, while folders remain visible for navigation. Hosts that
+  expose an entire model directory must register that directory explicitly as a root with no kind hint.
 
 ## 15. Known gaps
 
