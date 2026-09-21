@@ -174,7 +174,8 @@ class DownloadManager:
         root_id = destination.root_id
         root_path = self.library.root_path(root_id)
         rel = req.rel_dir if req.rel_dir is not None else destination.rel_dir
-        return root_id, to_rel(root_path, resolve_in_root(root_path, rel)) if rel else "", resolve_in_root(root_path, rel)
+        target = resolve_in_root(root_path, rel, follow_symlinks=self.library.follow_symlinks)
+        return root_id, to_rel(root_path, target) if rel else "", target
 
     def create(self, req: DownloadCreate) -> DownloadJob:
         given = [x for x in (req.source_file, req.hub, req.url) if x]

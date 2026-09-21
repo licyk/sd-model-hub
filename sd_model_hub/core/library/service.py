@@ -195,7 +195,7 @@ class LibraryService:
         a root is found there rather than where it really lives.
         """
         given = Path(os.path.abspath(path.expanduser()))
-        candidates = [given, given.resolve()] if self._follow_symlinks() else [given.resolve()]
+        candidates = [given, given.resolve()] if self.follow_symlinks else [given.resolve()]
         for target in candidates:
             best: tuple[str, Path] | None = None
             for root in self._roots():
@@ -239,7 +239,7 @@ class LibraryService:
             root_id = next((r.id for r in roots if kind and r.kind == kind), roots[0].id)
         root_path = self.root_path(root_id)
         rel = self.default_dest(root_id, kind) if rel_dir is None else rel_dir
-        target = resolve_in_root(root_path, rel)
+        target = resolve_in_root(root_path, rel, follow_symlinks=self.follow_symlinks)
         return DownloadDestination(root_id=root_id, rel_dir=to_rel(root_path, target))
 
     @staticmethod
@@ -251,7 +251,9 @@ class LibraryService:
 
     # -- browsing -----------------------------------------------------------
 
-    def _follow_symlinks(self) -> bool:
+    @property
+    def follow_symlinks(self) -> bool:
+        """Whether a link leaving a root may be browsed, downloaded into and operated on."""
         return self.settings.settings.library.follow_symlinks
 
     def _resolve(self, root_id: str, rel_path: str, must_exist: bool = True) -> tuple[ModelRoot, Path, Path]:
@@ -259,7 +261,7 @@ class LibraryService:
         root_path = self.root_path(root_id)
         if not root_path.is_dir():
             raise NotFoundError(f"Root folder is missing: {root_path}")
-        target = resolve_in_root(root_path, rel_path, follow_symlinks=self._follow_symlinks())
+        target = resolve_in_root(root_path, rel_path, follow_symlinks=self.follow_symlinks)
         if must_exist and not target.exists():
             raise NotFoundError(f"Not found: {rel_path}")
         return root, root_path, target
@@ -314,6 +316,8 @@ class LibraryService:
         models: list[ModelEntry] = []
         pending = 0
         for s in scanned.models:
+            if not self._link_allowed(root_path, s.path):
+                continue
             try:
                 entry, is_pending = self._entry(root, root_path, s, detect)
             except OSError:
@@ -325,21 +329,22 @@ class LibraryService:
         folders = [
             FolderEntry(name=p.name, path=to_rel(root_path, p), folder_kind=self._folder_kind(root, to_rel(root_path, p)))
             for p in scanned.folders
-            if self._folder_allowed(root_path, p)
+            if self._link_allowed(root_path, p)
         ]
         rel = to_rel(root_path, target)
         if pending and detect == "cached":
             self.scan_in_background(root_id, rel)
         return FolderListing(root_id=root_id, path=rel, folder_kind=self._folder_kind(root, rel), folders=folders, models=models, pending_detection=pending)
 
-    def _folder_allowed(self, root_path: Path, folder: Path) -> bool:
-        """Hide a symlinked folder that leaves the root while symlinks are not followed.
+    def _link_allowed(self, root_path: Path, path: Path) -> bool:
+        """Hide a folder or a model that a link leads outside the root, while links are not followed.
 
-        It could not be opened anyway, so listing it would only produce an error on the way in.
+        Neither could be opened anyway, so listing one would only produce an error on the way in.
+        The links themselves are followed by default, so the check usually costs nothing.
         """
-        if self._follow_symlinks() or not folder.is_symlink():
+        if self.follow_symlinks or not path.is_symlink():
             return True
-        return not escapes_root(root_path, folder)
+        return not escapes_root(root_path, path)
 
     @staticmethod
     def _kind_matches(entry: ModelEntry, kind: str) -> bool:
@@ -364,7 +369,7 @@ class LibraryService:
         seen: set[tuple[int, int]] = set()
         while stack:
             current = stack.pop()
-            key = self._dir_id(resolve_in_root(root_path, current, follow_symlinks=self._follow_symlinks()))
+            key = self._dir_id(resolve_in_root(root_path, current, follow_symlinks=self.follow_symlinks))
             if key is not None:
                 if key in seen:
                     continue
@@ -391,7 +396,7 @@ class LibraryService:
             except OSError:
                 return node
             for sub in subdirs:
-                if (sub / "model_index.json").is_file() or not self._folder_allowed(root_path, sub):
+                if (sub / "model_index.json").is_file() or not self._link_allowed(root_path, sub):
                     continue
                 node.children.append(build(sub, depth + 1))
             return node

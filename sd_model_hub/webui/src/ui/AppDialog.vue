@@ -76,9 +76,11 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 
 <style scoped>
 .scrim { position: fixed; inset: 0; background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent); z-index: 40; }
-.layer { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--app-space-4); z-index: 41; }
+/* The explicit minmax(0, …) column is what keeps a panel with wide content — a long file name, a
+   metadata table — inside the window instead of letting the track grow to its minimum size. */
+.layer { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: var(--app-space-4); z-index: 41; }
 .dialog {
-  display: flex; flex-direction: column; max-height: calc(100vh - 32px); width: 100%; outline: none;
+  display: flex; flex-direction: column; max-height: calc(100vh - 32px); width: 100%; min-width: 0; outline: none;
   background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface);
   border-radius: var(--md-sys-shape-corner-extra-large); box-shadow: var(--app-elevation-3);
 }
@@ -86,11 +88,18 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 .medium { max-width: 640px; }
 .large { max-width: 1040px; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--app-space-2); padding: var(--app-space-4) var(--app-space-4) 0 var(--app-space-6); }
-.title { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A model name can be one long unbroken word: break it, and keep the header at two lines. */
+.title { margin: 0; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .body { padding: var(--app-space-4) var(--app-space-6); overflow: auto; flex: 1; }
 .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--app-space-2); padding: 0 var(--app-space-6) var(--app-space-6); }
 @media (max-width: 599px) {
   .layer { padding: 0; align-items: end; }
-  .dialog { max-height: 92vh; border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0; }
+  /* A bottom sheet on a phone: dvh follows the browser's collapsing toolbars, and the inset keeps
+     the last row clear of the home indicator. */
+  .dialog { max-height: 92vh; max-height: 92dvh; padding-bottom: env(safe-area-inset-bottom); border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0; }
+  .title { font-size: var(--md-sys-typescale-title-large-size); line-height: var(--md-sys-typescale-title-large-line-height); }
+  .head { padding: var(--app-space-4) var(--app-space-2) 0 var(--app-space-4); }
+  .body { padding: var(--app-space-3) var(--app-space-4); }
+  .actions { padding: 0 var(--app-space-4) var(--app-space-4); }
 }
 </style>

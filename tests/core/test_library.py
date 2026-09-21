@@ -126,18 +126,49 @@ def _link_outside(tmp_path: Path, root_dir: Path) -> Path:
     return outside
 
 
-def test_symlinked_folder_hidden_by_default(services, root_dir, root, tmp_path):
+def _tree_folders(services, root_id: str, name: str) -> list[str]:
+    """The names below one top-level folder of the tree, selected by name rather than by position."""
+    node = next(c for c in services.library.tree(root_id).children if c.name == name)
+    return [c.name for c in node.children]
+
+
+def test_symlinked_folder_shown_by_default(services, root_dir, root, tmp_path):
+    """Links are followed unless they are turned off: a linked folder is not silently missing."""
     _link_outside(tmp_path, root_dir)
     listing = services.library.list_entries(root.id, "loras")
+    assert sorted(f.name for f in listing.folders) == ["linked", "style"]
+    assert [m.path for m in services.library.list_entries(root.id, "loras/linked").models] == ["loras/linked/linked.safetensors"]
+    assert "linked" in _tree_folders(services, root.id, "loras")
+
+
+def test_symlinked_model_file_shown_by_default(services, root_dir, root, tmp_path):
+    outside = tmp_path / "elsewhere"
+    write_safetensors(outside / "linked.safetensors", LORA_SDXL)
+    os.symlink(outside / "linked.safetensors", root_dir / "loras" / "linked.safetensors")
+
+    listing = services.library.list_entries(root.id, "loras")
+    assert [m.name for m in listing.models] == ["linked.safetensors"]
+    assert services.library.model_info(root.id, "loras/linked.safetensors").entry.size > 0
+
+
+def test_symlinks_turned_off_hide_what_leaves_the_root(services, root_dir, root, tmp_path):
+    """Off, a link out of the root is hidden rather than listed and then refused on the way in."""
+    outside = _link_outside(tmp_path, root_dir)
+    os.symlink(outside / "linked.safetensors", root_dir / "loras" / "file-link.safetensors")
+    services.settings.update({"library": {"follow_symlinks": False}})
+
+    listing = services.library.list_entries(root.id, "loras")
     assert [f.name for f in listing.folders] == ["style"]
+    assert [m.name for m in listing.models] == []
     with pytest.raises(InvalidPathError):
         services.library.list_entries(root.id, "loras/linked")
-    assert "linked" not in [c.name for c in services.library.tree(root.id).children[0].children]
+    with pytest.raises(InvalidPathError):
+        services.library.model_info(root.id, "loras/file-link.safetensors")
+    assert "linked" not in _tree_folders(services, root.id, "loras")
 
 
 def test_follow_symlinks_setting_opens_linked_folders(services, root_dir, root, tmp_path):
     outside = _link_outside(tmp_path, root_dir)
-    services.settings.update({"library": {"follow_symlinks": True}})
 
     listing = services.library.list_entries(root.id, "loras")
     assert sorted(f.name for f in listing.folders) == ["linked", "style"]
@@ -159,7 +190,6 @@ def test_follow_symlinks_setting_opens_linked_folders(services, root_dir, root, 
 
 def test_symlink_loop_is_walked_once(services, root_dir, root):
     os.symlink(root_dir / "loras", root_dir / "loras" / "style" / "loop")
-    services.settings.update({"library": {"follow_symlinks": True}})
     write_safetensors(root_dir / "loras" / "m.safetensors", LORA_SD1)
     models = list(services.library.walk_models(root.id, "loras"))
     assert [m.name for m in models] == ["m.safetensors"]

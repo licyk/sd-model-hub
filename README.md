@@ -237,17 +237,21 @@ An environment variable takes precedence over both, and the settings page says s
 ### Symbolic links
 
 A model folder whose contents are symbolic links to another disk — as a WebUI install often has
-for its LoRAs — needs one setting, because links that leave the model folder are refused by
-default:
+for its LoRAs — works out of the box: links are followed by default, so a linked folder is
+listed, opens and keeps the path you navigate with, and can be downloaded into. Deleting, moving
+and renaming then act on the files where they really are.
+
+Turn that off if you would rather nothing outside a model folder can be touched through the
+interface:
 
 ```bash
-sd-model-hub config set library.follow_symlinks true
+sd-model-hub config set library.follow_symlinks false
 ```
 
-It is also in Settings, under Content & Library. With it on, linked folders open and keep the
-path you navigate with; deleting, moving and renaming then act on the files where they really
-are. Paths containing `..`, absolute paths and reserved names are still refused in either mode,
-and a folder reached twice through a loop of links is walked once.
+It is also in Settings, under Content & Library. Off, anything a link leads outside its root is
+hidden from listings rather than shown and then refused on the way in. Paths containing `..`,
+absolute paths and reserved names are refused in either mode, and a folder reached twice through
+a loop of links is walked once.
 
 ## Files SD Model Hub writes next to a model
 

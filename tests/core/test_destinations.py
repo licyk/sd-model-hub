@@ -97,11 +97,15 @@ def test_missing_destination_root_is_not_silently_replaced(services, root):
     assert services.library.suggest_destination("lora", root.id).root_id == root.id
 
 
-def test_destination_rejects_symlink_escape(services, root, root_dir, tmp_path):
+def test_destination_follows_a_linked_folder_and_refuses_it_when_links_are_off(services, root, root_dir, tmp_path):
+    """A linked folder is a destination like any other: browsing it and downloading into it agree."""
     outside = tmp_path / "outside"
     outside.mkdir()
     (root_dir / "escape").symlink_to(outside, target_is_directory=True)
     services.settings.update({"downloads": {"kind_destinations": {"lora": {"root_id": root.id, "rel_dir": "escape"}}}})
+    assert services.library.suggest_destination("lora").rel_dir == "escape"
+
+    services.settings.update({"library": {"follow_symlinks": False}})
     with pytest.raises(InvalidPathError):
         services.library.suggest_destination("lora")
 

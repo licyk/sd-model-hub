@@ -86,10 +86,12 @@ async function copy(text: string) {
                 {{ formatBytes(f.size) }}<template v-if="f.kind"> · {{ f.kind }}</template><template v-if="f.format"> · {{ f.format }}</template><template v-if="f.scan_result"> · scan: {{ f.scan_result }}</template>
               </span>
             </div>
-            <Badge v-if="f.primary" tone="neutral" :value="t('detail.primary')" />
-            <AppButton :variant="f.primary ? 'filled' : 'tonal'" :icon="icons.Download" @click="emit('download', { file: f, versionId: version!.id, kind: detail.data.value!.kind ?? null, name: detail.data.value!.name })">
-              {{ t('common.download') }}
-            </AppButton>
+            <div class="file-actions">
+              <Badge v-if="f.primary" tone="neutral" :value="t('detail.primary')" />
+              <AppButton :variant="f.primary ? 'filled' : 'tonal'" :icon="icons.Download" @click="emit('download', { file: f, versionId: version!.id, kind: detail.data.value!.kind ?? null, name: detail.data.value!.name })">
+                {{ t('common.download') }}
+              </AppButton>
+            </div>
           </li>
         </ul>
       </section>
@@ -116,14 +118,23 @@ async function copy(text: string) {
 h3 { margin: 0 0 var(--app-space-2); }
 .words { display: flex; flex-wrap: wrap; gap: var(--app-space-2); }
 .word {
-  display: inline-flex; align-items: center; gap: var(--app-space-1); height: 32px; padding: 0 var(--app-space-3); cursor: pointer; font: inherit; font-weight: 500;
+  display: inline-flex; align-items: center; gap: var(--app-space-1); min-height: 32px; max-width: 100%; padding: var(--app-space-1) var(--app-space-3); cursor: pointer; font: inherit; font-weight: 500;
+  text-align: left; overflow-wrap: anywhere;
   border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--md-sys-shape-corner-small); background: transparent; color: var(--md-sys-color-on-surface-variant);
 }
 .files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--app-space-2); }
-.file { display: flex; align-items: center; gap: var(--app-space-3); padding: var(--app-space-2) var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); }
-.file-icon { color: var(--md-sys-color-on-surface-variant); }
-.file-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* Too narrow for one row — a phone — and the badge and the button drop to a line of their own. */
+.file { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-space-2) var(--app-space-3); padding: var(--app-space-2) var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); }
+.file-icon { color: var(--md-sys-color-on-surface-variant); flex: none; }
+.file-text { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; }
+.file-actions { display: flex; align-items: center; gap: var(--app-space-2); margin-left: auto; }
 .name { overflow-wrap: anywhere; }
-.description { white-space: pre-line; margin: 0; max-height: 320px; overflow: auto; }
+.description { white-space: pre-line; margin: 0; max-height: 320px; overflow: auto; overflow-wrap: anywhere; }
 .error { color: var(--md-sys-color-error); }
+@media (max-width: 599px) {
+  .gallery { grid-auto-columns: 132px; }
+  .link { margin-left: 0; }
+  /* The sheet itself scrolls; a second scrolling box inside it fights the touch gesture. */
+  .description { max-height: none; overflow: visible; }
+}
 </style>

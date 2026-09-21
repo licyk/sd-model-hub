@@ -166,12 +166,16 @@ const rows = computed(() => {
 .preview { border-radius: var(--md-sys-shape-corner-medium); overflow: hidden; }
 .facts { display: flex; flex-direction: column; gap: var(--app-space-3); min-width: 0; }
 .warning { display: flex; gap: var(--app-space-2); align-items: flex-start; padding: var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
-.table { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--app-space-1) var(--app-space-4); margin: 0; }
+/* Header metadata brings keys of any length: the label column may shrink and wrap rather than
+   push the value column out of the dialog. */
+.table { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: var(--app-space-1) var(--app-space-4); margin: 0; }
+dt { overflow-wrap: anywhere; }
 dd { margin: 0; overflow-wrap: anywhere; }
 .mono { font-family: ui-monospace, monospace; font-size: var(--md-sys-typescale-body-small-size); }
 .actions { display: flex; gap: var(--app-space-2); }
 .results { display: flex; flex-direction: column; gap: var(--app-space-2); }
-.result { display: flex; align-items: center; gap: var(--app-space-2); padding: var(--app-space-2) var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); color: inherit; text-decoration: none; }
+.result { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-space-2); padding: var(--app-space-2) var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); color: inherit; text-decoration: none; }
+.result > span { min-width: 0; overflow-wrap: anywhere; }
 .divider { margin: var(--app-space-4) 0; }
 .section { margin-bottom: var(--app-space-4); }
 .section h3 { margin: 0 0 var(--app-space-2); }
@@ -181,6 +185,10 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .error { color: var(--md-sys-color-error); }
 @media (max-width: 599px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
-  .preview { max-width: 240px; }
+  .preview { max-width: 240px; margin-inline: auto; }
+  /* Two columns leave nothing for a path or a hash: label over value instead. */
+  .table { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .table dt { margin-top: var(--app-space-2); }
+  .table dt:first-child { margin-top: 0; }
 }
 </style>

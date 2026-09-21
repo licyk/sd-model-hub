@@ -232,10 +232,16 @@ offers permanent deletion.
 
 **Path safety** is one function every operation calls (`library/safety.py`): components are
 validated (no `..`, no separators, no control characters, no Windows-reserved names, no trailing
-dot or space), and the result must stay inside the root. By default a symlink leaving the root is
-refused and such folders are hidden from listings; `library.follow_symlinks` opens them, keeps the
-path relative to the root, and walks a loop of links only once. Nothing is ever overwritten: a
-clash raises `ConflictError`, and callers may ask for an automatic numeric suffix.
+dot or space), and the result must stay inside the root. `library.follow_symlinks` is **on by
+default**: a linked model folder is what the user put there — a WebUI's LoRAs on another disk —
+and hiding it only looks like the files are missing. Following a link keeps the path relative to
+the root, walks a loop of links only once, and makes operations act on the files where they
+really are. The setting covers browsing, the download destination and every file operation
+together: a folder that can be opened can also be downloaded into. Turned off, a path that a link
+leads outside its root is refused, and both folders and model files it leads out are hidden from
+listings — listing something that cannot be opened only moves the error to the way in.
+Nothing is ever overwritten: a clash raises `ConflictError`, and callers may ask for an automatic
+numeric suffix.
 
 ## 8. Downloads
 
@@ -401,6 +407,15 @@ and tabs, `container` for card-to-dialog, `sheet` for drawers, `list` for grids 
 capped), `collapse`, `snackbar`. Under `prefers-reduced-motion` everything becomes a short fade and
 ripples are off. Navigation follows the window size classes: bottom bar below 600 px, rail above.
 
+**Dialogs on a phone.** `AppDialog` becomes a bottom sheet below 600 px, with the phone's own
+gutters and `env(safe-area-inset-bottom)` under the last row. Its centring grid declares
+`minmax(0, 1fr)`: with the default `auto` track, a panel whose content has a wide minimum — a long
+file name, a metadata table, a trigger word — grew the track past the window and pushed the whole
+dialog off screen. Inside a dialog the same rule applies to every row: label-and-value tables stack
+into one column, rows of controls wrap, and long names get `overflow-wrap: anywhere`. Nothing but
+the image gallery scrolls sideways, and nested vertical scroll areas are dropped below 600 px so
+the sheet itself takes the gesture.
+
 Preferences (theme, source colour, contrast, language, last source and root, view mode) are client
 state: `localStorage` plus the server's client-state endpoint, with an early script in
 `index.html` applying the theme before the bundle loads to avoid a flash.
@@ -476,7 +491,9 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 
 - `core` imports no web or CLI framework; the API and CLI stay thin.
 - Never unpickle a model file. Never copy code from ComfyUI (GPL-3.0).
-- Never overwrite a user's file silently; never delete outside a root.
+- Never overwrite a user's file silently; never delete outside a root, where "inside a root" means
+  reachable from it by a path the client may write — a link the user put inside a root included,
+  while `library.follow_symlinks` is on. `..`, absolute paths and reserved names stay refused.
 - A credential is never returned to a client, written into a job record, logged, or sent to a host
   other than the one it belongs to.
 - Text from a source is never trusted as HTML. A model description is rendered as text. A hub

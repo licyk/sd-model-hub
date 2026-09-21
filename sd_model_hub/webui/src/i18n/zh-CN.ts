@@ -248,7 +248,7 @@ const zhCN: typeof en = {
     deleteToTrash: '删除到回收站',
     deleteToTrashHelp: '服务器上的回收站通常没人清空。关闭后将永久删除。',
     followSymlinks: '跟随模型文件夹内的符号链接',
-    followSymlinksHelp: '可以打开指向其他位置的链接文件夹，例如链接到另一块硬盘的 LoRA 文件夹。此时删除或移动会作用于文件的真实位置。',
+    followSymlinksHelp: '默认开启。指向其他位置的链接文件夹会正常显示并可以打开，例如链接到另一块硬盘的 LoRA 文件夹，此时删除或移动会作用于文件的真实位置。关闭后，链接指向模型文件夹之外的内容将被隐藏。',
     theme: '主题',
     themes: { light: '浅色', dark: '深色', system: '跟随系统' },
     sourceColor: '主题色',

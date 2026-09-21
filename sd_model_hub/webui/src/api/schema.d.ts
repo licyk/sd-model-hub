@@ -1275,7 +1275,7 @@ export interface components {
             delete_to_trash: boolean;
             /**
              * Follow Symlinks
-             * @default false
+             * @default true
              */
             follow_symlinks: boolean;
             /** Model Extensions */

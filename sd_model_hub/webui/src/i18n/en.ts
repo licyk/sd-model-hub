@@ -246,7 +246,7 @@ export default {
     deleteToTrash: 'Delete to the trash',
     deleteToTrashHelp: 'On a server nobody empties the trash. Turn off to delete permanently.',
     followSymlinks: 'Follow symbolic links inside model folders',
-    followSymlinksHelp: 'Opens linked folders that point elsewhere, such as a LoRA folder linked to another disk. Deleting or moving then affects the files where they really are.',
+    followSymlinksHelp: 'On by default. Linked folders that point elsewhere, such as a LoRA folder on another disk, are listed and open; deleting or moving then affects the files where they really are. Off, anything a link leads outside a model folder is hidden.',
     theme: 'Theme',
     themes: { light: 'Light', dark: 'Dark', system: 'System' },
     sourceColor: 'Source colour',

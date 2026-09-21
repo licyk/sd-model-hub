@@ -74,9 +74,11 @@ class ContentSettings(Record):
 
 class LibrarySettings(Record):
     delete_to_trash: bool = True
-    # Off by default: a symlink that leaves the root is refused. On, symlinked folders inside a
-    # root can be opened, and operations act on the files where they really are.
-    follow_symlinks: bool = False
+    # On by default: a linked model folder — a WebUI's LoRAs on another disk — is what the user
+    # put there, and hiding it only looks like the files are missing. Links are followed for
+    # browsing and for downloads, and operations act on the files where they really are. Off,
+    # anything a link leads outside the root is hidden and refused.
+    follow_symlinks: bool = True
     model_extensions: list[str] = Field(default_factory=lambda: list(DEFAULT_MODEL_EXTENSIONS))
     preview_extensions: list[str] = Field(default_factory=lambda: list(DEFAULT_PREVIEW_EXTENSIONS))
 
