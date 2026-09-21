@@ -1,7 +1,7 @@
 import createClient, { type Middleware } from 'openapi-fetch';
+import { BASE_URL } from '@/api/baseUrl';
+import type { paths } from '@/api/schema';
 import { useAuthStore } from '@/stores/auth';
-import { BASE_URL } from './baseUrl';
-import type { paths } from './schema';
 
 export class ApiError extends Error {
   constructor(

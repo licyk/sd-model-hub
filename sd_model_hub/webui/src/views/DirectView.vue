@@ -64,36 +64,38 @@ function queue(dest: Destination) {
     <Surface :level="0" shape="large" class="section">
       <h2 class="type-title-large">{{ t('direct.title') }}</h2>
       <p class="type-body-medium muted intro">{{ t('direct.intro') }}</p>
-      <TextField
-        v-model="url"
-        type="url"
-        :label="t('direct.url')"
-        :placeholder="t('direct.urlPlaceholder')"
-        :icon="icons.Link"
-        :supporting-text="t('direct.urlHelp')"
-        :error-text="urlError || undefined"
-        autocomplete="off"
-        @enter="ready && (pickerOpen = true)"
-      />
-      <TextField
-        v-model="fileName"
-        :label="t('direct.fileName')"
-        :placeholder="urlName || undefined"
-        :icon="icons.File"
-        :supporting-text="t('direct.fileNameHelp')"
-        autocomplete="off"
-        @enter="ready && (pickerOpen = true)"
-      />
-      <TextField
-        v-model="sha256"
-        :label="t('direct.sha256')"
-        :icon="icons.Fingerprint"
-        :supporting-text="t('direct.sha256Help')"
-        :error-text="shaError || undefined"
-        autocomplete="off"
-        @enter="ready && (pickerOpen = true)"
-      />
-      <SelectField v-model="kind" :label="t('direct.kind')" :options="kindOptions" :supporting-text="t('direct.kindHelp')" />
+      <div class="fields">
+        <TextField
+          v-model="url"
+          type="url"
+          :label="t('direct.url')"
+          :placeholder="t('direct.urlPlaceholder')"
+          :icon="icons.Link"
+          :supporting-text="t('direct.urlHelp')"
+          :error-text="urlError || undefined"
+          autocomplete="off"
+          @enter="ready && (pickerOpen = true)"
+        />
+        <TextField
+          v-model="fileName"
+          :label="t('direct.fileName')"
+          :placeholder="urlName || undefined"
+          :icon="icons.File"
+          :supporting-text="t('direct.fileNameHelp')"
+          autocomplete="off"
+          @enter="ready && (pickerOpen = true)"
+        />
+        <TextField
+          v-model="sha256"
+          :label="t('direct.sha256')"
+          :icon="icons.Fingerprint"
+          :supporting-text="t('direct.sha256Help')"
+          :error-text="shaError || undefined"
+          autocomplete="off"
+          @enter="ready && (pickerOpen = true)"
+        />
+        <SelectField v-model="kind" :label="t('direct.kind')" :options="kindOptions" :supporting-text="t('direct.kindHelp')" />
+      </div>
       <p class="type-body-small muted note"><AppIcon :icon="icons.Info" :size="18" /> {{ t('direct.note') }}</p>
       <div class="actions">
         <AppButton :icon="icons.Download" :disabled="!ready" @click="pickerOpen = true">{{ t('direct.choose') }}</AppButton>
@@ -105,11 +107,14 @@ function queue(dest: Destination) {
 </template>
 
 <style scoped>
-.direct { display: flex; flex-direction: column; gap: var(--app-space-4); padding: var(--app-space-4) var(--app-space-6) var(--app-space-8); max-width: 720px; }
+.direct { display: flex; flex-direction: column; gap: var(--app-space-4); padding: var(--app-space-4) var(--app-space-6) var(--app-space-8); }
 .section { display: flex; flex-direction: column; gap: var(--app-space-3); padding: var(--app-space-4) var(--app-space-6) var(--app-space-6); }
 h2 { margin: 0; }
 p { margin: 0; }
 .intro { margin-bottom: var(--app-space-2); }
+/* The form fills the window: one column when narrow, more as the width allows. */
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--app-space-3); align-items: start; }
+.fields > :first-child { grid-column: 1 / -1; }
 .note { display: flex; align-items: center; gap: var(--app-space-1); }
 .actions { display: flex; justify-content: flex-end; }
 @media (max-width: 599px) {

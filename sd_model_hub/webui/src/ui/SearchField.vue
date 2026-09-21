@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import AppIcon from './AppIcon.vue';
-import { Search, X } from './icons';
+import AppIcon from '@/ui/AppIcon.vue';
+import { Search, X } from '@/ui/icons';
 
 /** A pill-shaped search bar. Emits ``search`` on Enter; v-model follows every keystroke. */
 defineProps<{ placeholder?: string; label?: string }>();

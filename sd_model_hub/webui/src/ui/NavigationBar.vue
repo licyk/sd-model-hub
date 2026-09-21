@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
-import AppIcon from './AppIcon.vue';
-import type { NavItem } from './NavigationRail.vue';
+import AppIcon from '@/ui/AppIcon.vue';
+import type { NavItem } from '@/ui/NavigationRail.vue';
 
 defineProps<{ items: NavItem[] }>();
 </script>

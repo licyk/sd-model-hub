@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, type Ref } from 'vue';
-import { prefersReducedMotion } from './transitions';
+import { prefersReducedMotion } from '@/ui/motion/transitions';
 
 /** A ripple from the pointer position on press, for project-built interactive components. */
 export function useRipple(target: Ref<HTMLElement | null | undefined>) {

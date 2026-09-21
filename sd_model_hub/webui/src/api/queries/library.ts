@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
-import { api, unwrap } from '../client';
-import type { S } from '../types';
-import { keys } from './keys';
+import { api, unwrap } from '@/api/client';
+import { keys } from '@/api/queries/keys';
+import type { S } from '@/api/types';
 
 export const useRoots = () => useQuery({ queryKey: keys.roots, queryFn: () => unwrap(api.GET('/api/v1/library/roots')) });
 

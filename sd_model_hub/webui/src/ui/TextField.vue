@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import '@material/web/textfield/outlined-text-field.js';
 import type { Component } from 'vue';
-import AppIcon from './AppIcon.vue';
+import AppIcon from '@/ui/AppIcon.vue';
 
 withDefaults(
   defineProps<{

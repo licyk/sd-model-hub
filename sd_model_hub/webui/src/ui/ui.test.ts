@@ -1,16 +1,17 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
+import { formatBytes, parentPath, pathSegments } from '@/format';
 import { translate } from '@/i18n';
 import { windowClass } from '@/theme/breakpoints';
 import { generateScheme } from '@/theme/scheme';
-import { formatBytes, parentPath, pathSegments } from '@/format';
-import Breadcrumbs from './Breadcrumbs.vue';
-import EmptyState from './EmptyState.vue';
-import SegmentedButton from './SegmentedButton.vue';
-import { Box } from './icons';
-import { containerFrom, staggerStyle } from './motion/transitions';
-import { useSnackbar } from './useSnackbar';
+import Breadcrumbs from '@/ui/Breadcrumbs.vue';
+import EmptyState from '@/ui/EmptyState.vue';
+import ExpansionPanel from '@/ui/ExpansionPanel.vue';
+import SegmentedButton from '@/ui/SegmentedButton.vue';
+import { Box } from '@/ui/icons';
+import { containerFrom, staggerStyle } from '@/ui/motion/transitions';
+import { useSnackbar } from '@/ui/useSnackbar';
 
 describe('ui components', () => {
   it('SegmentedButton selects one option', async () => {
@@ -33,6 +34,21 @@ describe('ui components', () => {
     const wrapper = mount(EmptyState, { props: { icon: Box, title: 'Nothing', text: 'here' } });
     expect(wrapper.text()).toContain('Nothing');
     expect(wrapper.text()).toContain('here');
+  });
+
+  it('ExpansionPanel shows its content only when open, and reports the change', async () => {
+    const wrapper = mount(ExpansionPanel, { props: { label: 'Model card' }, slots: { default: '<p>body</p>' } });
+    const header = wrapper.find('button');
+    expect(header.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.text()).not.toContain('body');
+
+    await header.trigger('click');
+    await nextTick();
+    expect(header.attributes('aria-expanded')).toBe('true');
+    expect(wrapper.text()).toContain('body');
+    expect(wrapper.emitted('update:open')?.[0]).toEqual([true]);
+    // The header labels the region it opens, so a screen reader announces the pair.
+    expect(wrapper.find('[role="region"]').attributes('aria-labelledby')).toBe(header.attributes('id'));
   });
 
   it('snackbar queue shows one message at a time', () => {

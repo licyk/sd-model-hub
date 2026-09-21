@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/vue-query';
-import { api, unwrap } from '../client';
-import type { DownloadCreate, DownloadJob } from '../types';
-import { keys } from './keys';
+import { api, unwrap } from '@/api/client';
+import { keys } from '@/api/queries/keys';
+import type { DownloadCreate, DownloadJob } from '@/api/types';
 
 export const useDownloads = () => useQuery({ queryKey: keys.downloads, queryFn: () => unwrap(api.GET('/api/v1/downloads')) });
 

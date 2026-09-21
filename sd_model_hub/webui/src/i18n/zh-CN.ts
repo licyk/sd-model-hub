@@ -1,4 +1,4 @@
-import type en from './en';
+import type en from '@/i18n/en';
 
 const zhCN: typeof en = {
   app: { title: 'SD Model Hub' },

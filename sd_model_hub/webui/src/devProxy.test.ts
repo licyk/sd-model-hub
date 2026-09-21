@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isExpectedProxyError } from '../vite.config';
+import { isExpectedProxyError } from '@/../vite.config';
 
 /**
  * While developing, the API server restarts often and the socket reconnects. Those proxy

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import AppButton from './AppButton.vue';
-import TextField from './TextField.vue';
-import { KeyRound } from './icons';
+import AppButton from '@/ui/AppButton.vue';
+import TextField from '@/ui/TextField.vue';
+import { KeyRound } from '@/ui/icons';
 
 /**
  * A write-only secret. The server never returns a token, only whether one is configured,

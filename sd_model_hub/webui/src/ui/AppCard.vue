@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRipple } from './motion/useRipple';
+import { useRipple } from '@/ui/motion/useRipple';
 
 /** An elevated card built from the tokens. When ``interactive``, it has a state layer and a ripple. */
 const props = withDefaults(defineProps<{ interactive?: boolean; selected?: boolean; variant?: 'elevated' | 'filled' | 'outlined' }>(), { variant: 'filled' });

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoots, useTree } from '@/api/queries/library';
+import FolderTree from '@/components/FolderTree.vue';
 import { useI18n } from '@/i18n';
 import { AppButton, AppDialog, SelectField } from '@/ui';
-import FolderTree from './FolderTree.vue';
 
 /** Pick a destination folder in any root. */
 const props = defineProps<{ count: number; rootId: string | null; loading?: boolean }>();

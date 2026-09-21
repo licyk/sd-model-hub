@@ -1,8 +1,8 @@
 import { flushPromises, shallowMount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, ref, toValue } from 'vue';
-import LibraryView from './LibraryView.vue';
 import { SelectField } from '@/ui';
+import LibraryView from '@/views/LibraryView.vue';
 
 const queries = vi.hoisted(() => ({ entries: vi.fn(), replace: vi.fn() }));
 vi.mock('vue-router', () => ({

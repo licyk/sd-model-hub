@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useClearFinished, useDownloads } from '@/api/queries/downloads';
+import DownloadItem from '@/components/DownloadItem.vue';
 import { formatBytes } from '@/format';
 import { useI18n } from '@/i18n';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useUploadsStore } from '@/stores/uploads';
 import { AppButton, AppIcon, EmptyState, IconButton, ProgressBar, SideSheet, icons } from '@/ui';
-import DownloadItem from './DownloadItem.vue';
 
 /** All jobs with progress, speed, and pause, resume and cancel; plus uploads from drag and drop. */
 const { t } = useI18n();

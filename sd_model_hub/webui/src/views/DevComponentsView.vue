@@ -8,6 +8,7 @@ import {
   Breadcrumbs,
   Checkbox,
   EmptyState,
+  ExpansionPanel,
   Fab,
   FilterChip,
   IconButton,
@@ -36,6 +37,7 @@ const seg = ref<'a' | 'b' | 'c'>('a');
 const tab = ref<'one' | 'two'>('one');
 const select = ref<string | null>('x');
 const dialog = ref(false);
+const expanded = ref(true);
 const snackbar = useSnackbar();
 </script>
 
@@ -76,6 +78,9 @@ const snackbar = useSnackbar();
       <Breadcrumbs :crumbs="[{ label: 'root', value: '' }, { label: 'loras', value: 'loras' }, { label: 'style', value: 'loras/style' }]" />
       <AppCard interactive style="max-width: 240px; padding: 16px">Interactive card</AppCard>
       <EmptyState :icon="icons.Box" title="Empty state" text="Supporting text" />
+      <ExpansionPanel v-model:open="expanded" label="Expansion panel" supporting-text="Click the header" :icon="icons.FileText">
+        <p class="type-body-medium">Content that slides open and closed.</p>
+      </ExpansionPanel>
       <div class="row">
         <AppButton variant="tonal" @click="dialog = true">Dialog</AppButton>
         <AppButton variant="tonal" @click="snackbar.show('Snackbar message', { actionLabel: 'Undo', action: () => undefined })">Snackbar</AppButton>

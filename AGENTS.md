@@ -376,11 +376,14 @@ says so while it applies.
 ## 11. Web UI
 
 Vue 3 + Vite + TypeScript, Pinia, TanStack Vue Query, `openapi-fetch` with generated types,
-socket.io-client, Lucide icons, `@material/web` wrapped inside `src/ui/`. Hash-history routing, so
+socket.io-client, Lucide icons, `@material/web` wrapped inside `src/ui/`. Modules under `src/`
+import each other by absolute path through the `@/` alias (`vite.config.ts` and `tsconfig.json`
+agree on it), never relatively; `imports.test.ts` holds that. Hash-history routing, so
 one build works under any sub-path; the API base URL is derived from the running script's URL,
 and Vite's `base` is `'./'` so assets resolve wherever the app is mounted. Fonts and icons are
 bundled: nothing is fetched from a third-party origin at run time, except preview images, which
-load straight from each source's CDN.
+load straight from each source's CDN, and the images a hub model card embeds, which load lazily
+with no referrer. Model cards are rendered with markdown-it (`src/markdown.ts`), raw HTML off.
 
 Material Design 3 in two layers. Colour roles are generated from one source colour with
 `@material/material-color-utilities` (Tonal Spot, light and dark, contrast level) and written to
@@ -460,7 +463,7 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
   revocation, the manual/OAuth matrix, no credential in any response); the API with `TestClient`;
   the CLI with `CliRunner`, including a snapshot of the whole command tree; the architecture rule.
 - **Web (vitest + vue-tsc):** the base-URL helper, `ui/` components, theme generation, i18n,
-  formatting, the no-literal-colours rule, the dev proxy filter.
+  formatting, the no-literal-colours and absolute-import rules, the dev proxy filter.
 - Tests that need the network are marked `live` and deselected by default.
 - When you fix a bug, add the test that would have caught it.
 
@@ -471,7 +474,10 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - Never overwrite a user's file silently; never delete outside a root.
 - A credential is never returned to a client, written into a job record, logged, or sent to a host
   other than the one it belongs to.
-- Text from a source (a model description, a README) is rendered as text, never as HTML.
+- Text from a source is never trusted as HTML. A model description is rendered as text. A hub
+  model card is Markdown, rendered through `webui/src/markdown.ts` with markdown-it's `html`
+  option off, so raw HTML inside it is escaped and shown rather than parsed; `markdown.test.ts`
+  holds that promise.
 - `websockets` stays a declared dependency: uvicorn speaks WebSocket only with it or `wsproto`,
   and without one the socket silently drops to long polling.
 - Manual API tokens keep working with no OAuth configured, and nothing switches authentication

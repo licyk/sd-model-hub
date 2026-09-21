@@ -18,6 +18,7 @@ export {
   EyeOff,
   File,
   FileBox,
+  FileText,
   Folder,
   FolderInput,
   FolderOpen,

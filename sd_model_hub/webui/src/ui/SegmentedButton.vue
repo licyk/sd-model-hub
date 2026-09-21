@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends string">
 import type { Component } from 'vue';
-import AppIcon from './AppIcon.vue';
-import { Check } from './icons';
+import AppIcon from '@/ui/AppIcon.vue';
+import { Check } from '@/ui/icons';
 
 /** Single-select segmented button, built from the tokens (@material/web has none). */
 defineProps<{ options: { value: T; label?: string; icon?: Component; ariaLabel?: string }[] }>();

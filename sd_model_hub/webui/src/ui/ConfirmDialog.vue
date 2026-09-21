@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AppButton from './AppButton.vue';
-import AppDialog from './AppDialog.vue';
+import AppButton from '@/ui/AppButton.vue';
+import AppDialog from '@/ui/AppDialog.vue';
 
 defineProps<{ title: string; message?: string; confirmLabel: string; cancelLabel: string; danger?: boolean; loading?: boolean }>();
 const open = defineModel<boolean>('open', { default: false });

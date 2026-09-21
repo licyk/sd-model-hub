@@ -7,10 +7,10 @@ import { keys } from '@/api/queries/keys';
 import { fetchModelHash, useModelInfo } from '@/api/queries/library';
 import { useIdentify } from '@/api/queries/sources';
 import type { IdentifyResult } from '@/api/types';
+import PreviewImage from '@/components/PreviewImage.vue';
 import { formatBytes, formatDate } from '@/format';
 import { useI18n } from '@/i18n';
 import { AppButton, AppDialog, AppIcon, Badge, Divider, Skeleton, icons, useSnackbar } from '@/ui';
-import PreviewImage from './PreviewImage.vue';
 
 /** Detection result, hash, sidecars and a lookup on the sources by hash, for one local model. */
 const props = defineProps<{ rootId: string | null; path: string | null; fromRect?: DOMRect | null }>();

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
-import { api, unwrap } from '../client';
-import type { SettingsView } from '../types';
-import { keys } from './keys';
+import { api, unwrap } from '@/api/client';
+import { keys } from '@/api/queries/keys';
+import type { SettingsView } from '@/api/types';
 
 export const useMeta = () => useQuery({ queryKey: keys.meta, queryFn: () => unwrap(api.GET('/api/v1/app/meta')), staleTime: Infinity });
 

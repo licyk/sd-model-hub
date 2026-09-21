@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/vue-query';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
-import { api, unwrap } from '../client';
-import { keys } from './keys';
+import { api, unwrap } from '@/api/client';
+import { keys } from '@/api/queries/keys';
 
 export interface SearchParams {
   query: string;

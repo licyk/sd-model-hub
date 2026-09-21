@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
-import { api, unwrap } from '../client';
-import type { S } from '../types';
-import { keys } from './keys';
+import { api, unwrap } from '@/api/client';
+import { keys } from '@/api/queries/keys';
+import type { S } from '@/api/types';
 
 export type AuthMethod = 'manual' | 'oauth';
 

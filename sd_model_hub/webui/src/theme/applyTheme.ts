@@ -1,4 +1,4 @@
-import { generateScheme, ROLES, toKebab } from './scheme';
+import { generateScheme, ROLES, toKebab } from '@/theme/scheme';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 

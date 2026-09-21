@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch, type Component } from 'vue';
-import AppIcon from './AppIcon.vue';
+import AppIcon from '@/ui/AppIcon.vue';
 
 export interface MenuItem {
   id: string;

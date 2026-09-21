@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useWindowClass } from '@/theme/breakpoints';
-import NavigationBar from './NavigationBar.vue';
-import NavigationRail, { type NavItem } from './NavigationRail.vue';
-import Snackbar from './Snackbar.vue';
-import TopAppBar from './TopAppBar.vue';
+import NavigationBar from '@/ui/NavigationBar.vue';
+import NavigationRail, { type NavItem } from '@/ui/NavigationRail.vue';
+import Snackbar from '@/ui/Snackbar.vue';
+import TopAppBar from '@/ui/TopAppBar.vue';
 
 /** Navigation switches between a bottom bar (compact) and a rail (medium and wider). */
 defineProps<{ items: NavItem[]; title: string }>();

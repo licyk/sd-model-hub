@@ -2,8 +2,8 @@
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/iconbutton/filled-tonal-icon-button.js';
 import type { Component } from 'vue';
-import AppIcon from './AppIcon.vue';
-import Badge from './Badge.vue';
+import AppIcon from '@/ui/AppIcon.vue';
+import Badge from '@/ui/Badge.vue';
 
 withDefaults(defineProps<{ icon: Component; label: string; tonal?: boolean; disabled?: boolean; badge?: number | string | null; spin?: boolean }>(), { badge: null });
 defineEmits<{ click: [MouseEvent] }>();

@@ -1,10 +1,10 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
-import { ApiError } from './api/client';
-import App from './App.vue';
-import { router } from './router';
-import './theme/tokens.css';
+import App from '@/App.vue';
+import { ApiError } from '@/api/client';
+import { router } from '@/router';
+import '@/theme/tokens.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

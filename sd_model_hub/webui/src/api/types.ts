@@ -1,4 +1,4 @@
-import type { components } from './schema';
+import type { components } from '@/api/schema';
 
 /** Shorthand for the generated schemas. */
 export type S = components['schemas'];

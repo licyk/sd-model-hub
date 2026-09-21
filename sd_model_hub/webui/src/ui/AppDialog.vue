@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import IconButton from './IconButton.vue';
-import { X } from './icons';
-import { containerFrom } from './motion/transitions';
+import IconButton from '@/ui/IconButton.vue';
+import { X } from '@/ui/icons';
+import { containerFrom } from '@/ui/motion/transitions';
 
 /**
  * A modal dialog built from the tokens. With ``fromRect`` it grows from that rectangle (the

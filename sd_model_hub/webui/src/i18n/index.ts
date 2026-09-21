@@ -1,7 +1,7 @@
 import { computed } from 'vue';
+import en from '@/i18n/en';
+import zhCN from '@/i18n/zh-CN';
 import { usePreferencesStore, type Locale } from '@/stores/preferences';
-import en from './en';
-import zhCN from './zh-CN';
 
 const MESSAGES: Record<Locale, typeof en> = { en, 'zh-CN': zhCN };
 export const LOCALES: { value: Locale; label: string }[] = [

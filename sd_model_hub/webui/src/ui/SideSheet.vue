@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from 'vue';
-import IconButton from './IconButton.vue';
-import { X } from './icons';
+import IconButton from '@/ui/IconButton.vue';
+import { X } from '@/ui/icons';
 
 /** A modal side sheet that slides in from the right edge (the ``sheet`` transition). */
 withDefaults(defineProps<{ title: string; closeLabel?: string }>(), { closeLabel: 'Close' });

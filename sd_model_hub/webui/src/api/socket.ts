@@ -1,12 +1,12 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { io, type Socket } from 'socket.io-client';
+import { BASE_PATH, BASE_URL } from '@/api/baseUrl';
+import { applyJobEvent, forgetJobs, markRunning } from '@/api/queries/downloads';
+import { keys } from '@/api/queries/keys';
+import type { DownloadJob, ServerEvents } from '@/api/types';
 import { useAuthStore } from '@/stores/auth';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useUploadsStore } from '@/stores/uploads';
-import { BASE_PATH, BASE_URL } from './baseUrl';
-import { keys } from './queries/keys';
-import { applyJobEvent, forgetJobs, markRunning } from './queries/downloads';
-import type { DownloadJob, ServerEvents } from './types';
 
 type Listeners = { [K in keyof ServerEvents]: (payload: ServerEvents[K]) => void };
 

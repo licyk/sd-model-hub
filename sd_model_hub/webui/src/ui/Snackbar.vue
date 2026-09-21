@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import IconButton from './IconButton.vue';
-import { X } from './icons';
-import { useSnackbar } from './useSnackbar';
+import IconButton from '@/ui/IconButton.vue';
+import { X } from '@/ui/icons';
+import { useSnackbar } from '@/ui/useSnackbar';
 
 /** Renders the head of the snackbar queue. Mount once, in the app shell. */
 const { state, dismiss } = useSnackbar();

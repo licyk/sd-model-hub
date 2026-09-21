@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/vue-query';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
-import { api, unwrap } from '../client';
-import { keys } from './keys';
+import { api, unwrap } from '@/api/client';
+import { keys } from '@/api/queries/keys';
 
 export const useHubs = () => useQuery({ queryKey: keys.hubs, queryFn: () => unwrap(api.GET('/api/v1/hubs')), staleTime: 60_000 });
 

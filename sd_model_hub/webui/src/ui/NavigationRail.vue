@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue';
 import { RouterLink } from 'vue-router';
-import AppIcon from './AppIcon.vue';
+import AppIcon from '@/ui/AppIcon.vue';
 
 export interface NavItem {
   to: string;

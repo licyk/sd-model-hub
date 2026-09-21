@@ -5,7 +5,7 @@ import '@material/web/button/outlined-button.js';
 import '@material/web/button/text-button.js';
 import '@material/web/progress/circular-progress.js';
 import { computed, type Component } from 'vue';
-import AppIcon from './AppIcon.vue';
+import AppIcon from '@/ui/AppIcon.vue';
 
 /** One emphasis hierarchy: filled for the primary action of a region, tonal for secondary, outlined or text for the rest. */
 const props = withDefaults(

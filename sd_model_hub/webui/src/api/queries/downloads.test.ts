@@ -1,8 +1,8 @@
 import { QueryClient } from '@tanstack/vue-query';
 import { describe, expect, it } from 'vitest';
-import { applyJobAnswer, applyJobEvent, markRunning } from './downloads';
-import { keys } from './keys';
-import type { DownloadJob } from '../types';
+import { applyJobAnswer, applyJobEvent, markRunning } from '@/api/queries/downloads';
+import { keys } from '@/api/queries/keys';
+import type { DownloadJob } from '@/api/types';
 
 const job = (over: Partial<DownloadJob> = {}): DownloadJob =>
   ({

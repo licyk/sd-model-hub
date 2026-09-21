@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
-import DestinationPicker from './DestinationPicker.vue';
+import DestinationPicker from '@/components/DestinationPicker.vue';
 import { AppButton, SelectField, TextField } from '@/ui';
 
 const get = vi.hoisted(() => vi.fn());

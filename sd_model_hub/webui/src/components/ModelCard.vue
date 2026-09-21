@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import PreviewImage from '@/components/PreviewImage.vue';
 import { AppCard, AppIcon, Badge, Tooltip, icons } from '@/ui';
-import PreviewImage from './PreviewImage.vue';
 
 /**
  * Preview, name, kind and base-model badges, and actions. Used for source results and for local

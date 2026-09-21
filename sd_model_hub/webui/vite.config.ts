@@ -78,6 +78,7 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    // Modules under src/ import each other through '@/...', never by a relative path.
     alias: { '@': new URL('./src', import.meta.url).pathname },
   },
   server: {

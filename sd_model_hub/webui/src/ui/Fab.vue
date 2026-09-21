@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import '@material/web/fab/fab.js';
 import type { Component } from 'vue';
-import AppIcon from './AppIcon.vue';
+import AppIcon from '@/ui/AppIcon.vue';
 
 defineProps<{ icon: Component; label?: string; ariaLabel?: string }>();
 defineEmits<{ click: [MouseEvent] }>();

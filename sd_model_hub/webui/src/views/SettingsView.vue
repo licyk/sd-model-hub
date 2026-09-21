@@ -185,8 +185,9 @@ const envNote = (key: string) => (s.value?.env_overrides.includes(key) ? t('sett
 </template>
 
 <style scoped>
-.settings { display: flex; flex-direction: column; gap: var(--app-space-4); padding: var(--app-space-4) var(--app-space-6) var(--app-space-8); max-width: 920px; }
-.skeletons { display: flex; flex-direction: column; gap: var(--app-space-4); }
+/* The sections fill the window: one column when narrow, more as the width allows. */
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; gap: var(--app-space-4); padding: var(--app-space-4) var(--app-space-6) var(--app-space-8); }
+.skeletons { grid-column: 1 / -1; display: flex; flex-direction: column; gap: var(--app-space-4); }
 .section { display: flex; flex-direction: column; gap: var(--app-space-2); padding: var(--app-space-4) var(--app-space-6) var(--app-space-6); }
 h2 { margin: 0 0 var(--app-space-2); }
 .field-row { display: flex; align-items: center; justify-content: space-between; gap: var(--app-space-4); min-height: 56px; flex-wrap: wrap; }

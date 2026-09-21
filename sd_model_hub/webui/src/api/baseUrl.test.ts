@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveBaseUrl } from './baseUrl';
+import { deriveBaseUrl } from '@/api/baseUrl';
 
 describe('deriveBaseUrl', () => {
   it('strips the assets folder at the root', () => {

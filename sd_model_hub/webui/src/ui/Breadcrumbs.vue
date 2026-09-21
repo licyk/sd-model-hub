@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AppIcon from './AppIcon.vue';
-import { ChevronRight } from './icons';
+import AppIcon from '@/ui/AppIcon.vue';
+import { ChevronRight } from '@/ui/icons';
 
 export interface Crumb {
   label: string;

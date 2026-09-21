@@ -1,9 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
-import DirectView from './DirectView.vue';
 import DestinationPicker from '@/components/DestinationPicker.vue';
 import { AppButton, TextField } from '@/ui';
+import DirectView from '@/views/DirectView.vue';
 
 const mutate = vi.hoisted(() => vi.fn());
 vi.mock('@/api/queries/downloads', () => ({ useCreateDownload: () => ({ mutate, isPending: ref(false) }) }));

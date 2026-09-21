@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import TextField from './TextField.vue';
-import { Folder } from './icons';
+import TextField from '@/ui/TextField.vue';
+import { Folder } from '@/ui/icons';
 
 /** An absolute folder or file path on the server's machine. */
 defineProps<{ label: string; supportingText?: string; errorText?: string; placeholder?: string }>();

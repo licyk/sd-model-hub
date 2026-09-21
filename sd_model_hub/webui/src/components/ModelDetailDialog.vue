@@ -2,10 +2,10 @@
 import { computed, ref, watch } from 'vue';
 import { useModelDetail } from '@/api/queries/sources';
 import type { ModelFile } from '@/api/types';
+import PreviewImage from '@/components/PreviewImage.vue';
 import { formatBytes, formatCount } from '@/format';
 import { useI18n } from '@/i18n';
 import { AppButton, AppDialog, AppIcon, Badge, Divider, SelectField, Skeleton, icons } from '@/ui';
-import PreviewImage from './PreviewImage.vue';
 
 /** Description, versions, files with size and scan result, trigger words, and a download button per file. */
 const props = defineProps<{ source: string | null; modelId: string | null; fromRect?: DOMRect | null }>();
