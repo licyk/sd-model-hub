@@ -92,7 +92,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 5120,
   },
   test: {
     environment: 'happy-dom',

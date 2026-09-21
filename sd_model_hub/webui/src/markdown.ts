@@ -1,31 +1,60 @@
 /**
  * Render a model card (README) written in Markdown.
  *
- * The text comes from a third party, so raw HTML stays off: anything that looks like a tag is
- * escaped and shown, never parsed. Every attribute in the result is written by markdown-it's own
- * renderer, and markdown-it rejects `javascript:`-style link targets, so the output needs no
- * further sanitising. See `markdown.test.ts`, which holds these two promises.
+ * Model cards lean on HTML for what Markdown cannot express: centred banners, image rows,
+ * `<details>` sections, tables with spans. That HTML is parsed, but the text comes from a third
+ * party, so nothing reaches the page unchecked: markdown-it's output goes through DOMPurify with
+ * the allowlist below, which keeps document markup and drops everything that can execute, load a
+ * script, frame another page, or restyle the app. Links and images are hardened afterwards, so a
+ * raw `<a>` in the card is treated exactly like a Markdown one. See `markdown.test.ts`, which
+ * holds these promises.
  */
+import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 
-const md = new MarkdownIt({ html: false, linkify: true, breaks: false, typographer: false });
+const md = new MarkdownIt({ html: true, linkify: true, breaks: false, typographer: false });
 
-// Links leave the app, so they open in a new tab and carry no referrer or window handle.
-const renderLink = md.renderer.rules.link_open ?? ((tokens, i, options, _env, self) => self.renderToken(tokens, i, options));
-md.renderer.rules.link_open = (tokens, i, options, env, self) => {
-  tokens[i].attrSet('target', '_blank');
-  tokens[i].attrSet('rel', 'noopener noreferrer nofollow');
-  return renderLink(tokens, i, options, env, self);
-};
+/** Document markup only: no script, style, iframe, object, form, or custom element survives. */
+const ALLOWED_TAGS = [
+  'p', 'br', 'hr', 'div', 'span', 'center', 'section', 'article',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del', 'ins', 'mark', 'small', 'sub', 'sup', 'abbr',
+  'code', 'pre', 'kbd', 'samp', 'var', 'blockquote', 'q', 'cite',
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+  'a', 'img', 'figure', 'figcaption',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+  'details', 'summary',
+];
 
-/** Images are often broken or huge in a README; they load lazily and never block the text. */
-const renderImage = md.renderer.rules.image ?? ((tokens, i, options, _env, self) => self.renderToken(tokens, i, options));
-md.renderer.rules.image = (tokens, i, options, env, self) => {
-  tokens[i].attrSet('loading', 'lazy');
-  tokens[i].attrSet('referrerpolicy', 'no-referrer');
-  return renderImage(tokens, i, options, env, self);
-};
+/**
+ * No `class` or `style`: a card must not be able to borrow the app's styling or cover the page.
+ * `align`, `width` and `height` are the presentational attributes model cards actually use.
+ */
+const ALLOWED_ATTR = [
+  'href', 'src', 'alt', 'title', 'align', 'valign', 'width', 'height',
+  'colspan', 'rowspan', 'span', 'start', 'reversed', 'open', 'dir', 'lang',
+];
+
+// This module owns DOMPurify's hooks; it is the only caller.
+// Links leave the app, so they open in a new tab and carry no referrer or window handle;
+// images are often broken or huge in a README, so they load lazily and never block the text.
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer nofollow');
+  }
+  if (node.tagName === 'IMG') {
+    node.setAttribute('loading', 'lazy');
+    node.setAttribute('referrerpolicy', 'no-referrer');
+  }
+});
 
 export function renderMarkdown(text: string): string {
-  return md.render(text);
+  return DOMPurify.sanitize(md.render(text), {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+    ALLOW_UNKNOWN_PROTOCOLS: false,
+  });
 }

@@ -178,7 +178,7 @@ function queue(dest: Destination) {
               </AppButton>
             </div>
             <ExpansionPanel v-if="readme" v-model:open="readmeOpen" :label="t('hubs.readme')" :icon="icons.FileText">
-              <!-- Safe: the HTML is markdown-it's own output, rendered with raw HTML off. See src/markdown.ts. -->
+              <!-- Safe: markdown-it's output, sanitised with DOMPurify before it gets here. See src/markdown.ts. -->
               <div class="markdown type-body-medium" v-html="readmeHtml"></div>
             </ExpansionPanel>
           </template>
@@ -223,7 +223,7 @@ function queue(dest: Destination) {
 .note { display: flex; align-items: center; gap: var(--app-space-1); margin: 0; }
 .download-row { display: flex; justify-content: flex-end; }
 .markdown { max-height: 400px; overflow: auto; overflow-wrap: anywhere; padding: var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); }
-/* Rendered model card: the tags come from markdown-it, so they are styled here rather than in a component. */
+/* Rendered model card: the tags come from the card itself, so they are styled here rather than in a component. */
 .markdown > :deep(:first-child) { margin-top: 0; }
 .markdown > :deep(:last-child) { margin-bottom: 0; }
 .markdown :deep(h1), .markdown :deep(h2), .markdown :deep(h3), .markdown :deep(h4), .markdown :deep(h5), .markdown :deep(h6) {
@@ -240,8 +240,14 @@ function queue(dest: Destination) {
 .markdown :deep(blockquote) { padding-left: var(--app-space-3); border-left: 3px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); }
 .markdown :deep(img) { max-width: 100%; height: auto; }
 .markdown :deep(table) { border-collapse: collapse; display: block; overflow: auto; }
-.markdown :deep(th), .markdown :deep(td) { padding: var(--app-space-1) var(--app-space-2); border: 1px solid var(--md-sys-color-outline-variant); text-align: left; }
+.markdown :deep(th), .markdown :deep(td) { padding: var(--app-space-1) var(--app-space-2); border: 1px solid var(--md-sys-color-outline-variant); }
+.markdown :deep(th:not([align])), .markdown :deep(td:not([align])) { text-align: left; }
 .markdown :deep(hr) { border: 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+/* Tags a card brings itself rather than through Markdown. */
+.markdown :deep(details) { margin: var(--app-space-2) 0; }
+.markdown :deep(summary) { cursor: pointer; font-weight: var(--md-sys-typescale-title-small-weight); }
+.markdown :deep(figure) { margin: var(--app-space-2) 0; }
+.markdown :deep(figcaption) { color: var(--md-sys-color-on-surface-variant); font-size: 0.9em; }
 p { margin: 0; }
 @media (max-width: 899px) {
   .panes.has-repo { grid-template-columns: minmax(0, 1fr); }

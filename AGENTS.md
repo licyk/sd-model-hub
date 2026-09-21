@@ -383,7 +383,8 @@ one build works under any sub-path; the API base URL is derived from the running
 and Vite's `base` is `'./'` so assets resolve wherever the app is mounted. Fonts and icons are
 bundled: nothing is fetched from a third-party origin at run time, except preview images, which
 load straight from each source's CDN, and the images a hub model card embeds, which load lazily
-with no referrer. Model cards are rendered with markdown-it (`src/markdown.ts`), raw HTML off.
+with no referrer. Model cards are rendered with markdown-it (`src/markdown.ts`) with raw HTML
+on, then sanitised with DOMPurify before they reach the page.
 
 Material Design 3 in two layers. Colour roles are generated from one source colour with
 `@material/material-color-utilities` (Tonal Spot, light and dark, contrast level) and written to
@@ -463,7 +464,11 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
   revocation, the manual/OAuth matrix, no credential in any response); the API with `TestClient`;
   the CLI with `CliRunner`, including a snapshot of the whole command tree; the architecture rule.
 - **Web (vitest + vue-tsc):** the base-URL helper, `ui/` components, theme generation, i18n,
-  formatting, the no-literal-colours and absolute-import rules, the dev proxy filter.
+  formatting, the no-literal-colours and absolute-import rules, the dev proxy filter, and the
+  model-card sanitising. The default environment is happy-dom, but DOMPurify is a no-op there
+  (its walk stops when happy-dom's `NodeIterator` loses the removed walk root), so
+  `markdown.test.ts` sets `@vitest-environment jsdom` in its docblock. Any future test that
+  renders a model card needs the same line, or it will assert against unsanitised HTML.
 - Tests that need the network are marked `live` and deselected by default.
 - When you fix a bug, add the test that would have caught it.
 
@@ -475,9 +480,13 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 - A credential is never returned to a client, written into a job record, logged, or sent to a host
   other than the one it belongs to.
 - Text from a source is never trusted as HTML. A model description is rendered as text. A hub
-  model card is Markdown, rendered through `webui/src/markdown.ts` with markdown-it's `html`
-  option off, so raw HTML inside it is escaped and shown rather than parsed; `markdown.test.ts`
-  holds that promise.
+  model card is Markdown, rendered through `webui/src/markdown.ts`. Model cards need HTML for
+  what Markdown cannot express (centred banners, image rows, `<details>`), so markdown-it's
+  `html` option is on and the output is sanitised with DOMPurify against the allowlist in that
+  file: document markup only, no `class` or `style`, and every link and image hardened the same
+  way whether it came from Markdown or from a raw tag. Nothing reaches `v-html` unsanitised;
+  `markdown.test.ts` holds that promise. Widen the allowlist only for tags that cannot execute,
+  load a script, frame another page, or restyle the app.
 - `websockets` stays a declared dependency: uvicorn speaks WebSocket only with it or `wsproto`,
   and without one the socket silently drops to long polling.
 - Manual API tokens keep working with no OAuth configured, and nothing switches authentication
