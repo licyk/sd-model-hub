@@ -79,6 +79,10 @@ class LibrarySettings(Record):
     # browsing and for downloads, and operations act on the files where they really are. Off,
     # anything a link leads outside the root is hidden and refused.
     follow_symlinks: bool = True
+    # Off by default: the library is a model browser first, and a folder full of notes, archives
+    # and loose text files hides the models in it. On, every file a model does not already carry
+    # as a companion is listed too, so a folder can be managed like one in a file manager.
+    show_all_files: bool = False
     model_extensions: list[str] = Field(default_factory=lambda: list(DEFAULT_MODEL_EXTENSIONS))
     preview_extensions: list[str] = Field(default_factory=lambda: list(DEFAULT_PREVIEW_EXTENSIONS))
 

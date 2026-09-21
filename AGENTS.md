@@ -223,6 +223,15 @@ is on and no file exists. Also read: `<stem>.txt`, `<stem>.description.txt`, `<s
 **Ignored** everywhere: dot entries, `*.incomplete`, `*.part`, `*.tmp`. A folder containing
 `model_index.json` is one diffusers model, not a folder.
 
+**Files that are not models.** `library.show_all_files` is **off by default**: the library is a
+model browser first, and notes, archives and extensionless files would bury the models. On, every
+file no model claimed as a companion is listed as well, so a folder can be managed like one in a
+file manager. Such an entry carries `is_model: false`: it is never detected, has no sidecar hint,
+never counts towards `pending_detection`, is skipped by `walk_models` and by a kind filter, and
+shows a file icon and its extension in the interface. Move, rename and delete work on it as on
+anything else inside a root. `GET /api/v1/library/locate?path=` names the root holding an absolute
+path, which is how a finished download's folder is opened in the library.
+
 **Deleting** goes to the system trash through `send2trash`, which works on a headless machine: it
 falls back to its own implementation of the FreeDesktop specification, moving the file to
 `~/.local/share/Trash/files/` or to a `.Trash-<uid>` folder at the top of another filesystem.
@@ -420,6 +429,19 @@ Preferences (theme, source colour, contrast, language, last source and root, vie
 state: `localStorage` plus the server's client-state endpoint, with an early script in
 `index.html` applying the theme before the bundle loads to avoid a flash.
 
+**The starting screen** lives in `index.html`, inline, because it is painted before the bundle
+exists: a masked conic ring around the app mark drawing itself, the wordmark, and one line of
+text in the stored locale. It carries its own colours for both themes for the same reason — the
+design tokens arrive with the bundle — and it fades in after 120 ms so a cached start shows no
+loader at all. `main.ts` fades it out after `mount()` and removes it, with a timer in case the
+transition never fires. Under `prefers-reduced-motion` it is a plain fade.
+
+Uploads reach the library two ways: files or a whole folder dropped on the screen, and the same
+through the system file picker behind the **Upload** button, which uses one throwaway
+`<input type="file">` (`webkitdirectory` for a folder, `webkitRelativePath` for the structure).
+A finished download offers **Show in the library**, which opens the folder it landed in — through
+`locate` when the job was given an absolute folder and so carries no root.
+
 In development, Vite proxies `/api`, `/openapi.json` and `/ws`. Proxy failures that mean "the API
 server is restarting" (ECONNRESET, ECONNREFUSED, EPIPE…) are collapsed into one throttled line by
 a custom logger; everything else is still printed in full.
@@ -529,7 +551,8 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
   covered by a mock test, including the token being dropped on the redirect to storage.
 - ControlNet, embedding and upscaler detection rules have only synthetic fixtures.
 - hf-mirror and Gitee AI endpoints were never tested from a network that needs them.
-- Drag-and-drop upload is covered at the API level, not by dropping a file in a real browser.
+- Drag-and-drop upload and the file-picker upload are covered at the API level and in unit tests,
+  not by dropping or choosing a file in a real browser.
 - The Windows credential store, and the app on Windows generally, is untested.
 - The root `LICENSE` is the GPLv3 text copied from `sd-webui-all-in-one`.
 - **Before the first release:** the project has no `license` or `urls` metadata, and publishing

@@ -1,5 +1,6 @@
 """The local library."""
 
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Query, Request, status
@@ -38,6 +39,13 @@ class ScanResult(Record):
 @router.get("/destination", operation_id="suggest_download_destination")
 def suggest_destination(services: ServicesDep, kind: str | None = None, root_id: str | None = None) -> DownloadDestination:
     return services.library.suggest_destination(kind, root_id)
+
+
+@router.get("/locate", operation_id="locate_path")
+def locate_path(services: ServicesDep, path: str = Query(description="Absolute path on the server")) -> PathRef:
+    """Find the root that holds an absolute path, so a client can open it in the library."""
+    root_id, rel = services.library.locate(Path(path))
+    return PathRef(root_id=root_id, path=rel)
 
 
 @router.get("/roots", operation_id="list_roots")

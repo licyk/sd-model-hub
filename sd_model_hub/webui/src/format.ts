@@ -33,6 +33,12 @@ export function formatEta(remaining: number, speed: number): string {
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 }
 
+/** A file's extension in upper case, for an entry the library lists as a plain file. */
+export function fileExtensionLabel(name: string): string | null {
+  const ext = name.includes('.') ? name.split('.').pop() : null;
+  return ext ? ext.toUpperCase() : null;
+}
+
 /** Split a relative path into breadcrumb segments. */
 export function pathSegments(path: string): { name: string; path: string }[] {
   const parts = path.split('/').filter(Boolean);

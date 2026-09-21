@@ -8,7 +8,7 @@ import { fetchModelHash, useModelInfo } from '@/api/queries/library';
 import { useIdentify } from '@/api/queries/sources';
 import type { IdentifyResult } from '@/api/types';
 import PreviewImage from '@/components/PreviewImage.vue';
-import { formatBytes, formatDate } from '@/format';
+import { fileExtensionLabel, formatBytes, formatDate } from '@/format';
 import { useI18n } from '@/i18n';
 import { AppButton, AppDialog, AppIcon, Badge, Divider, Skeleton, icons, useSnackbar } from '@/ui';
 
@@ -63,10 +63,15 @@ async function lookup() {
 const rows = computed(() => {
   const e = entry.value;
   if (!e) return [];
-  return [
+  const common = [
     [t('info.path'), e.path],
     [t('info.size'), formatBytes(e.size)],
     [t('info.modified'), formatDate(e.mtime, locale.value)],
+  ];
+  // A plain file was never detected, so the detection rows would all read "—".
+  if (!e.is_model) return [...common, [t('info.kind'), fileExtensionLabel(e.name) ?? t('library.file')]];
+  return [
+    ...common,
     [t('info.kind'), kindLabel(det.value?.kind)],
     [t('info.base'), baseLabel(det.value?.base_model)],
     [t('info.prediction'), det.value?.prediction_type ?? '—'],
@@ -103,7 +108,8 @@ const rows = computed(() => {
             <template v-else>—</template>
           </dd>
         </dl>
-        <div v-if="!entry.is_dir" class="actions">
+        <!-- No source knows a plain file, so asking one about it only wastes a hash. -->
+        <div v-if="!entry.is_dir && entry.is_model" class="actions">
           <AppButton variant="tonal" :icon="icons.Fingerprint" :loading="hashing || identify.isPending.value" @click="lookup">{{ t('library.identify') }}</AppButton>
         </div>
         <div v-if="results" class="results">

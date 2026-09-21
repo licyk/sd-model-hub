@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type Component } from 'vue';
 import { useSettings } from '@/api/queries/app';
 import { AppIcon, Skeleton, icons } from '@/ui';
 
 /** Lazy image with a fixed aspect ratio, a skeleton while loading, a fallback icon, and NSFW blur. */
-const props = withDefaults(defineProps<{ src?: string | null; alt: string; nsfwLevel?: number; isVideo?: boolean; ratio?: string }>(), { nsfwLevel: 0, ratio: '3 / 4' });
+const props = withDefaults(defineProps<{ src?: string | null; alt: string; nsfwLevel?: number; isVideo?: boolean; ratio?: string; fallbackIcon?: Component }>(), {
+  nsfwLevel: 0,
+  ratio: '3 / 4',
+});
 const settings = useSettings();
 const state = ref<'loading' | 'loaded' | 'error'>(props.src ? 'loading' : 'error');
 const revealed = ref(false);
@@ -23,7 +26,7 @@ const blurred = computed(() => sensitive.value && settings.data.value?.content.n
 <template>
   <div class="preview" :style="{ aspectRatio: ratio }">
     <Skeleton v-if="state === 'loading'" class="fill" height="100%" shape="small" />
-    <div v-if="state === 'error'" class="fallback"><AppIcon :icon="icons.Image" :size="24" /></div>
+    <div v-if="state === 'error'" class="fallback"><AppIcon :icon="fallbackIcon ?? icons.Image" :size="24" /></div>
     <video v-if="src && isVideo" v-show="state !== 'error'" class="media" :class="{ blurred }" :src="src" muted loop autoplay playsinline @loadeddata="state = 'loaded'" @error="state = 'error'" />
     <img
       v-else-if="src"

@@ -15,7 +15,7 @@ import ModelInfoDialog from '@/components/ModelInfoDialog.vue';
 import MoveDialog from '@/components/MoveDialog.vue';
 import RenameDialog from '@/components/RenameDialog.vue';
 import RootDialog from '@/components/RootDialog.vue';
-import { formatBytes, pathSegments } from '@/format';
+import { fileExtensionLabel, formatBytes, pathSegments } from '@/format';
 import { useI18n } from '@/i18n';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -304,12 +304,35 @@ function rescan() {
   m.scan.mutate({ rootId: rootId.value, path: path.value }, { onSuccess: () => snackbar.show(t('library.scanStarted')) });
 }
 
-// Drag and drop: files land in the folder on screen.
-function onDrop(files: DroppedFile[]) {
-  if (!rootId.value) return;
+// Files land in the folder on screen, whether they were dropped or chosen in the file picker.
+function startUpload(files: DroppedFile[]) {
+  if (!rootId.value || !files.length) return;
   uploads.enqueue(rootId.value, path.value, files);
   snackbar.show(t('library.uploadStarted', { n: files.length }), { actionLabel: t('browse.openDownloads'), action: () => (downloadsStore.drawerOpen = true) });
 }
+
+/**
+ * Open the system file picker. The input is created here rather than kept in the template: a
+ * folder needs the non-standard ``webkitdirectory``, and a fresh input also fires ``change``
+ * when the same file is chosen twice.
+ */
+function pickFiles(directory: boolean) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  if (directory) input.webkitdirectory = true;
+  input.addEventListener('change', () => {
+    // The picker gives a folder's structure in webkitRelativePath, which the upload keeps.
+    startUpload(Array.from(input.files ?? []).map((file) => ({ file, relativePath: file.webkitRelativePath || file.name })));
+  });
+  input.click();
+}
+
+const uploadMenu = computed<MenuItem[]>(() => [
+  { id: 'files', label: t('library.uploadFiles'), icon: icons.File },
+  { id: 'folder', label: t('library.uploadFolder'), icon: icons.FolderInput },
+]);
+
 const stopListening = uploads.onFinished((item) => {
   if (item.state === 'failed') snackbar.error(t('library.uploadFailed', { name: item.name, error: item.error ?? '' }));
   qc.invalidateQueries({ queryKey: keys.entries(item.rootId) });
@@ -317,12 +340,17 @@ const stopListening = uploads.onFinished((item) => {
 });
 onBeforeUnmount(stopListening);
 
+/** A file listed only because library.show_all_files is on: shown by its extension, never detected. */
+const fileLabel = (model: ModelEntry) => fileExtensionLabel(model.name) ?? t('library.file');
+
 const warningFor = (model: ModelEntry) => (model.mismatch ? t('library.mismatchText') : null);
 const baseFor = (model: ModelEntry) => {
+  if (!model.is_model) return null;
   const b = model.detection?.base_model ?? model.sidecar?.base_model;
   return b ? (meta.data.value?.base_models.find((x) => x.value === b)?.label ?? b) : null;
 };
 const kindFor = (model: ModelEntry) => {
+  if (!model.is_model) return fileLabel(model);
   const k = model.detection?.kind && model.detection.kind !== 'unknown' ? model.detection.kind : (model.sidecar?.kind ?? model.folder_kind ?? 'unknown');
   return kindLabel(k);
 };
@@ -357,7 +385,7 @@ const kindFor = (model: ModelEntry) => {
       </aside>
 
       <section class="main">
-        <FileDropZone :label="t('library.dropHere', { folder: path || root?.name || '/' })" :disabled="!rootId" @files="onDrop">
+        <FileDropZone :label="t('library.dropHere', { folder: path || root?.name || '/' })" :disabled="!rootId" @files="startUpload">
           <div class="head">
             <Breadcrumbs :crumbs="crumbs" @navigate="navigate" />
             <div class="toolbar">
@@ -368,7 +396,12 @@ const kindFor = (model: ModelEntry) => {
                 <IconButton :icon="icons.X" :label="t('library.clearSelection')" @click="selection = new Set()" />
               </template>
               <template v-else>
-                <AppButton variant="tonal" :icon="icons.FolderInput" @click="importOpen = true">{{ t('library.import') }}</AppButton>
+                <AppMenu :items="uploadMenu" @select="pickFiles($event === 'folder')">
+                  <template #default="{ toggle }">
+                    <AppButton variant="tonal" :icon="icons.Upload" :disabled="!rootId" @click="toggle">{{ t('library.upload') }}</AppButton>
+                  </template>
+                </AppMenu>
+                <AppButton variant="text" :icon="icons.FolderInput" @click="importOpen = true">{{ t('library.import') }}</AppButton>
                 <IconButton :icon="icons.FolderPlus" :label="t('library.newFolder')" @click="folderOpen = true" />
                 <IconButton :icon="icons.RefreshCw" :label="t('library.rescan')" :spin="m.scan.isPending.value" @click="rescan" />
                 <SelectField :model-value="kind ?? ''" :label="t('library.filterKind')" :options="kindOptions" class="kind" @update:model-value="kind = $event || null" />
@@ -390,7 +423,8 @@ const kindFor = (model: ModelEntry) => {
               </div>
               <EmptyState v-else-if="entries.isError.value" :icon="icons.AlertTriangle" :title="t('common.error')" :text="(entries.error.value as Error)?.message" />
               <EmptyState v-else-if="!items.length" :icon="icons.FolderOpen" :title="t('library.emptyTitle')" :text="t('library.emptyText')">
-                <AppButton variant="tonal" :icon="icons.FolderInput" @click="importOpen = true">{{ t('library.import') }}</AppButton>
+                <AppButton variant="tonal" :icon="icons.Upload" :disabled="!rootId" @click="pickFiles(false)">{{ t('library.upload') }}</AppButton>
+                <AppButton variant="text" :icon="icons.FolderInput" @click="importOpen = true">{{ t('library.import') }}</AppButton>
               </EmptyState>
               <ModelGrid v-else :items="items" :item-key="itemKey" :layout="prefs.prefs.libraryView">
                 <template #default="{ item }">
@@ -410,10 +444,11 @@ const kindFor = (model: ModelEntry) => {
                     :title="item.model.name"
                     :subtitle="formatBytes(item.model.size)"
                     :preview="item.model.preview && rootId ? previewUrl(rootId, item.model.preview, prefs.prefs.libraryView === 'list' ? 128 : 384) : null"
+                    :fallback-icon="item.model.is_model ? undefined : icons.FileText"
                     :kind="kindFor(item.model)"
                     :base="baseFor(item.model)"
                     :warning="warningFor(item.model)"
-                    :pending="!item.model.detection && (listing?.pending_detection ?? 0) > 0"
+                    :pending="item.model.is_model && !item.model.detection && (listing?.pending_detection ?? 0) > 0"
                     :selected="selection.has(item.model.path)"
                     @activate="openInfo(item.model, $event)"
                   >

@@ -21,6 +21,8 @@ class ScannedModel:
     stem: str
     companions: list[Path] = field(default_factory=list)
     preview: Path | None = None
+    is_model: bool = True
+    """False for a plain file listed only because ``library.show_all_files`` is on."""
 
 
 @dataclass
@@ -44,8 +46,13 @@ def find_preview(stem: str, candidates: set[str], preview_extensions: list[str])
     return None
 
 
-def scan_dir(directory: Path, model_extensions: list[str], preview_extensions: list[str]) -> ScannedDir:
-    """List one directory: subfolders, and models with their companions and preview."""
+def scan_dir(directory: Path, model_extensions: list[str], preview_extensions: list[str], include_other_files: bool = False) -> ScannedDir:
+    """List one directory: subfolders, and models with their companions and preview.
+
+    With ``include_other_files``, every file no model claimed as a companion is listed too, so a
+    folder reads like one in a file manager. A preview or a sidecar stays with its model rather
+    than appearing twice.
+    """
     model_exts = {e.lower() for e in model_extensions}
     folders: list[Path] = []
     models: list[ScannedModel] = []
@@ -71,8 +78,12 @@ def scan_dir(directory: Path, model_extensions: list[str], preview_extensions: l
         names = {c.name for c in model.companions} & other_names
         preview = find_preview(model.stem, names, preview_extensions)
         model.preview = directory / preview if preview else None
+    if include_other_files:
+        claimed = {c for m in models for c in m.companions}
+        # The whole name is the stem of a plain file: it owns no companions and no sidecar.
+        models.extend(ScannedModel(p, False, p.name, is_model=False) for p in others if p not in claimed)
     folders.sort(key=lambda p: p.name.lower())
-    models.sort(key=lambda m: m.path.name.lower())
+    models.sort(key=lambda m: (not m.is_model, m.path.name.lower()))
     return ScannedDir(folders, models)
 
 

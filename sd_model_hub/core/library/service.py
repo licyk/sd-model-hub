@@ -275,6 +275,8 @@ class LibraryService:
         fkind = self._folder_kind(root, to_rel(root_path, path.parent))
         detection = None
         pending = False
+        if not scanned.is_model:
+            detect = "none"
         if detect == "full":
             detection = self.detection.detect(path)[0]
         elif detect == "cached":
@@ -283,7 +285,7 @@ class LibraryService:
                 detection = hit[0]
             else:
                 pending = True
-        hint = sidecar.sidecar_hint(path.parent, scanned.stem)
+        hint = sidecar.sidecar_hint(path.parent, scanned.stem) if scanned.is_model else None
         mismatch = False
         if detection is not None and detection.kind != "unknown":
             for other in (hint.kind if hint else None, fkind):
@@ -296,6 +298,7 @@ class LibraryService:
             stem=scanned.stem,
             path=rel,
             is_dir=scanned.is_dir,
+            is_model=scanned.is_model,
             size=size,
             mtime=datetime.fromtimestamp(st.st_mtime, tz=timezone.utc),
             preview=to_rel(root_path, scanned.preview) if scanned.preview else None,
@@ -312,7 +315,7 @@ class LibraryService:
         if not target.is_dir():
             raise InvalidPathError(f"Not a folder: {rel_path}")
         lib = self.settings.settings.library
-        scanned = scan_dir(target, lib.model_extensions, lib.preview_extensions)
+        scanned = scan_dir(target, lib.model_extensions, lib.preview_extensions, include_other_files=lib.show_all_files)
         models: list[ModelEntry] = []
         pending = 0
         for s in scanned.models:
@@ -323,7 +326,7 @@ class LibraryService:
             except OSError:
                 continue
             pending += is_pending
-            if kind and not self._kind_matches(entry, kind):
+            if kind and (not entry.is_model or not self._kind_matches(entry, kind)):
                 continue
             models.append(entry)
         folders = [
@@ -375,7 +378,7 @@ class LibraryService:
                     continue
                 seen.add(key)
             listing = self.list_entries(root_id, current, detect=detect, kind=kind)
-            yield from listing.models
+            yield from (m for m in listing.models if m.is_model)
             stack.extend(reversed([f.path for f in listing.folders]))
 
     def tree(self, root_id: str, max_depth: int = 16) -> TreeNode:
@@ -409,12 +412,16 @@ class LibraryService:
         if is_dir and not (target / "model_index.json").is_file():
             raise InvalidPathError(f"Not a model: {rel_path}")
         lib = self.settings.settings.library
-        stem = model_stem(target, is_dir)
-        scanned = ScannedModel(target, is_dir, stem, companions=companions_of(target, lib.model_extensions))
-        preview = find_preview(stem, {c.name for c in scanned.companions}, lib.preview_extensions)
+        is_model = self._is_model(target)
+        stem = model_stem(target, is_dir) if is_model else target.name
+        companions = companions_of(target, lib.model_extensions) if is_model else []
+        scanned = ScannedModel(target, is_dir, stem, companions=companions, is_model=is_model)
+        preview = find_preview(stem, {c.name for c in scanned.companions}, lib.preview_extensions) if is_model else None
         scanned.preview = target.parent / preview if preview else None
         entry, _ = self._entry(root, root_path, scanned, "full")
-        _, metadata = self.detection.detect(target)
+        metadata: dict[str, Any] = {}
+        if is_model:
+            _, metadata = self.detection.detect(target)
         sha = None
         if compute_hash and not is_dir:
             sha = self.detection.sha256(target)
@@ -426,10 +433,10 @@ class LibraryService:
             entry=entry,
             sha256=sha,
             header_metadata=metadata,
-            sdmodelhub=sidecar.read_sdmodelhub(target.parent, stem),
-            webui=sidecar.read_webui(target.parent, stem),
-            description=sidecar.read_description(target.parent, stem),
-            civitai_info=sidecar.read_civitai_info(target.parent, stem),
+            sdmodelhub=sidecar.read_sdmodelhub(target.parent, stem) if is_model else None,
+            webui=sidecar.read_webui(target.parent, stem) if is_model else None,
+            description=sidecar.read_description(target.parent, stem) if is_model else None,
+            civitai_info=sidecar.read_civitai_info(target.parent, stem) if is_model else None,
         )
 
     def preview_file(self, root_id: str, rel_path: str) -> Path:

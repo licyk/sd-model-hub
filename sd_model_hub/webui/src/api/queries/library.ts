@@ -6,6 +6,9 @@ import type { S } from '@/api/types';
 
 export const useRoots = () => useQuery({ queryKey: keys.roots, queryFn: () => unwrap(api.GET('/api/v1/library/roots')) });
 
+/** Turn an absolute folder on the server, such as a finished download's, into a root and a path. */
+export const locatePath = (path: string) => unwrap(api.GET('/api/v1/library/locate', { params: { query: { path } } }));
+
 export function useEntries(rootId: MaybeRefOrGetter<string | null>, path: MaybeRefOrGetter<string>, kind: MaybeRefOrGetter<string | null>) {
   return useQuery({
     queryKey: computed(() => keys.entries(toValue(rootId) ?? '', toValue(path), toValue(kind))),

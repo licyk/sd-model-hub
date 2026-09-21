@@ -78,6 +78,14 @@ def test_library_listing_and_preview(client, root):
     assert client.get(f"/api/v1/library/roots/{root_id}/entries", params={"path": "../.."}).status_code == 400
 
 
+def test_locate_finds_the_root_holding_a_path(client, root):
+    """A finished download names an absolute folder; the client turns it into a root and a path."""
+    root_id, d = root
+    r = client.get("/api/v1/library/locate", params={"path": str(d / "loras")})
+    assert r.status_code == 200 and r.json() == {"root_id": root_id, "path": "loras"}
+    assert client.get("/api/v1/library/locate", params={"path": str(d.parent / "elsewhere")}).status_code == 404
+
+
 def test_upload_streams_raw_body(client, root):
     root_id, d = root
     body = b"x" * (3 * 1024 * 1024 + 7)

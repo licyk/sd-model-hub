@@ -52,6 +52,8 @@ class ModelEntry(Record):
     stem: str
     path: str
     is_dir: bool = False
+    is_model: bool = True
+    """False for a plain file listed because ``library.show_all_files`` is on; it is never detected."""
     size: int
     mtime: datetime
     preview: str | None = None

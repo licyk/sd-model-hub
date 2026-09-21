@@ -103,6 +103,34 @@ def test_listing_groups_companions_and_previews(services, root_dir, root):
     assert listing.folders == []
 
 
+def test_show_all_files_lists_plain_files_only_when_on(services, root_dir, root):
+    """Off, a folder shows models; on, it reads like a file manager without doubling companions."""
+    lora = root_dir / "loras" / "style"
+    write_safetensors(lora / "a.safetensors", LORA_SDXL)
+    (lora / "a.png").write_bytes(b"png")
+    (lora / "notes.txt").write_text("hello")
+    (lora / "README").write_text("no suffix")
+    (lora / "unfinished.safetensors.part").write_bytes(b"x")
+
+    assert [m.name for m in services.library.list_entries(root.id, "loras/style").models] == ["a.safetensors"]
+
+    services.settings.update({"library": {"show_all_files": True}})
+    listing = services.library.list_entries(root.id, "loras/style")
+    # Models first, then the files no model claimed. The preview stays with its model.
+    assert [m.name for m in listing.models] == ["a.safetensors", "notes.txt", "README"]
+    plain = listing.models[1]
+    assert plain.is_model is False and plain.detection is None and plain.sidecar is None and plain.mismatch is False
+    assert listing.pending_detection == 0
+    # A kind filter is about models, and a plain file is never one of them.
+    assert [m.name for m in services.library.list_entries(root.id, "loras/style", kind="lora").models] == ["a.safetensors"]
+    assert [m.name for m in services.library.walk_models(root.id, "loras")] == ["a.safetensors"]
+    # A plain file can still be described, renamed and deleted like anything else in the root.
+    info = services.library.model_info(root.id, "loras/style/notes.txt")
+    assert info.entry.is_model is False and info.entry.companions == [] and info.description is None
+    services.library.rename(RenameRequest(root_id=root.id, path="loras/style/notes.txt", new_name="notes2.txt"))
+    assert (lora / "notes2.txt").exists() and (lora / "a.safetensors").exists()
+
+
 def test_listing_cached_mode_schedules_scan(services, root_dir, root):
     write_safetensors(root_dir / "loras" / "x.safetensors", LORA_SD1)
     events = []

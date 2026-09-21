@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, type Component } from 'vue';
 import PreviewImage from '@/components/PreviewImage.vue';
 import { AppCard, AppIcon, Badge, Tooltip, icons } from '@/ui';
 
@@ -16,6 +16,8 @@ defineProps<{
   kind?: string | null;
   base?: string | null;
   warning?: string | null;
+  /** Shown in place of the preview when there is none, e.g. a file icon for a plain file. */
+  fallbackIcon?: Component;
   pending?: boolean;
   selected?: boolean;
   layout?: 'grid' | 'list';
@@ -31,7 +33,7 @@ defineExpose({ rect: () => card.value?.el?.getBoundingClientRect() ?? null });
     <!-- In a row the checkbox leads; over a 72px thumbnail it would cover the picture. -->
     <div v-if="$slots.select && layout === 'list'" class="select-lead" @click.stop><slot name="select" /></div>
     <div class="media">
-      <PreviewImage :src="preview" :alt="title" :nsfw-level="nsfwLevel" :is-video="previewIsVideo" :ratio="layout === 'list' ? '1 / 1' : '3 / 4'" />
+      <PreviewImage :src="preview" :alt="title" :nsfw-level="nsfwLevel" :is-video="previewIsVideo" :ratio="layout === 'list' ? '1 / 1' : '3 / 4'" :fallback-icon="fallbackIcon" />
       <div v-if="$slots.select && layout !== 'list'" class="select-slot" @click.stop><slot name="select" /></div>
     </div>
     <div class="body">

@@ -145,6 +145,7 @@ const envNote = (key: string) => (s.value?.env_overrides.includes(key) ? t('sett
         </div>
         <Switch :model-value="s.library.delete_to_trash" :label="t('settings.deleteToTrash')" :supporting-text="t('settings.deleteToTrashHelp')" @update:model-value="save({ library: { delete_to_trash: $event } })" />
         <Switch :model-value="s.library.follow_symlinks" :label="t('settings.followSymlinks')" :supporting-text="t('settings.followSymlinksHelp')" @update:model-value="save({ library: { follow_symlinks: $event } })" />
+        <Switch :model-value="s.library.show_all_files" :label="t('settings.showAllFiles')" :supporting-text="t('settings.showAllFilesHelp')" @update:model-value="save({ library: { show_all_files: $event } })" />
       </Surface>
 
       <Surface :level="0" shape="large" class="section">

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useJobAction, useRemoveJob } from '@/api/queries/downloads';
+import { locatePath } from '@/api/queries/library';
 import type { DownloadJob } from '@/api/types';
 import { formatBytes, formatEta } from '@/format';
 import { useI18n } from '@/i18n';
@@ -9,6 +11,7 @@ import { AppIcon, IconButton, ProgressBar, icons, useSnackbar } from '@/ui';
 
 const props = defineProps<{ job: DownloadJob }>();
 const { t } = useI18n();
+const router = useRouter();
 const live = useDownloadsStore();
 const action = useJobAction();
 const remove = useRemoveJob();
@@ -37,6 +40,20 @@ const stateIcon = computed(
   () => ({ completed: icons.Check, failed: icons.AlertTriangle, cancelled: icons.X, paused: icons.Pause, queued: icons.Loader2, running: icons.ArrowDownToLine })[props.job.state],
 );
 
+/**
+ * Open the folder the file landed in. A job started with an absolute folder carries no root, so
+ * the server is asked which root holds it; one outside every root cannot be shown.
+ */
+async function openFolder() {
+  try {
+    const dest = props.job.root_id ? { root_id: props.job.root_id, path: props.job.rel_dir } : await locatePath(props.job.dest_dir);
+    live.drawerOpen = false;
+    router.push({ path: '/library', query: { root: dest.root_id, path: dest.path || undefined } });
+  } catch {
+    snackbar.error(t('downloads.openFolderFailed', { path: props.job.dest_dir }));
+  }
+}
+
 function run(kind: 'pause' | 'resume' | 'cancel' | 'restart') {
   action.mutate({ id: props.job.id, action: kind }, { onError: (e) => snackbar.error((e as Error).message) });
 }
@@ -60,6 +77,7 @@ function run(kind: 'pause' | 'resume' | 'cancel' | 'restart') {
       <IconButton v-if="job.state === 'running' && job.can_pause" :icon="icons.Pause" :label="t('downloads.pause')" @click="run('pause')" />
       <IconButton v-if="job.state === 'paused' || (job.state === 'failed' && job.can_pause)" :icon="icons.Play" :label="t('downloads.resume')" @click="run('resume')" />
       <IconButton v-if="job.state === 'failed' || job.state === 'cancelled'" :icon="icons.RotateCcw" :label="`${t('downloads.restart')} (${t('downloads.restartFromZero')})`" @click="run('restart')" />
+      <IconButton v-if="job.state === 'completed'" :icon="icons.FolderOpen" :label="t('downloads.openFolder')" @click="openFolder" />
       <IconButton v-if="job.state === 'running' || job.state === 'queued' || job.state === 'paused'" :icon="icons.X" :label="t('downloads.cancel')" @click="run('cancel')" />
       <IconButton v-else :icon="icons.Trash2" :label="t('downloads.remove')" @click="remove.mutate(job.id)" />
     </div>

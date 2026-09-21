@@ -52,6 +52,8 @@ def root_remove(root_id: Annotated[str, typer.Argument(help="Root id")]) -> None
 
 def _kind_label(entry) -> tuple[str, str]:  # type: ignore[no-untyped-def]
     det = entry.detection
+    if not entry.is_model:
+        return "file", ""
     kind = det.kind if det else "?"
     base = (det.base_model if det else None) or (entry.sidecar.base_model if entry.sidecar else None) or ""
     if entry.mismatch:

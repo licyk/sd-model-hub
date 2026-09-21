@@ -459,6 +459,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/library/locate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Locate Path
+         * @description Find the root that holds an absolute path, so a client can open it in the library.
+         */
+        get: operations["locate_path"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/library/roots": {
         parameters: {
             query?: never;
@@ -1278,6 +1298,11 @@ export interface components {
              * @default true
              */
             follow_symlinks: boolean;
+            /**
+             * Show All Files
+             * @default false
+             */
+            show_all_files: boolean;
             /** Model Extensions */
             model_extensions: string[];
             /** Preview Extensions */
@@ -1352,6 +1377,11 @@ export interface components {
              * @default false
              */
             is_dir: boolean;
+            /**
+             * Is Model
+             * @default true
+             */
+            is_model: boolean;
             /** Size */
             size: number;
             /**
@@ -3457,6 +3487,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DownloadDestination"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    locate_path: {
+        parameters: {
+            query: {
+                /** @description Absolute path on the server */
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathRef"];
                 };
             };
             /** @description Bad Request */
