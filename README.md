@@ -315,29 +315,3 @@ python scripts/dev.py wheel              # the same, through the task runner
 
 A bare `python -m build` produces a wheel without the web UI, because setuptools packages only
 the files that exist when it runs; the server then logs a warning and serves the API only.
-
-## Releasing
-
-`.github/workflows/release.yml` publishes to PyPI when a push to `main` changes
-`sd_model_hub/version.py`, when a `v*` tag is pushed, or through **Run workflow** in the Actions tab.
-For a version change on `main`:
-
-```bash
-python scripts/dev.py check                 # first, locally
-# bump VERSION in sd_model_hub/version.py, commit
-git push origin main
-```
-
-The workflow runs the tests and ty checks on Python 3.10 to 3.14, the web UI tests and type-check, and the
-generated-types check; for tag runs it verifies that the tag matches `sd_model_hub/version.py`, then builds
-the wheel **with the web UI in it**, checks the wheel really contains the UI and the detection
-rules, installs it into a clean environment and runs `sd-model-hub version`. Only then does it
-publish. Tag runs also create the GitHub release with the built files attached.
-
-Publishing runs `python -m twine upload` directly on the runner, without a Docker action.
-Existing files are skipped so retrying a release does not upload them again.
-
-Set-up, once: create a PyPI API token and save it as the GitHub Actions secret `TWINE_PASSWORD`
-in this repository or its `pypi` environment. Create that environment in the repository settings;
-it can also require an approval before a release goes out. The workflow uses `__token__` as the
-username and does not require a trusted publisher.
