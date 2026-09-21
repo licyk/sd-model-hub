@@ -1,4 +1,29 @@
+<div align="center">
+
 # SD Model Hub
+
+<p align="center">
+  <a href="https://github.com/licyk/sd-model-hub/stargazers">
+    <img src="https://img.shields.io/github/stars/licyk/sd-model-hub?style=flat&logo=github&logoColor=silver&color=bluegreen&labelColor=grey" alt="Stars">
+  </a>
+  <a href="https://github.com/licyk/sd-model-hub/issues">
+    <img src="https://img.shields.io/github/issues/licyk/sd-model-hub?style=flat&logo=github&logoColor=silver&color=bluegreen&labelColor=grey" alt="Issues">
+  </a>
+  <a href="https://github.com/licyk/sd-model-hub/commits/main">
+    <img src="https://flat.badgen.net/github/last-commit/licyk/sd-model-hub/main?icon=github&color=green&label=last%20main%20commit" alt="Last main commit">
+  </a>
+  <a href="https://github.com/licyk/sd-model-hub/actions/workflows/release.yml">
+    <img src="https://github.com/licyk/sd-model-hub/actions/workflows/release.yml/badge.svg" alt="Release">
+  </a>
+  <a href="https://pypi.org/project/sd-model-hub/">
+    <img src="https://img.shields.io/pypi/v/sd-model-hub?style=flat&logo=pypi&logoColor=silver&color=bluegreen&labelColor=grey" alt="PyPI version">
+  </a>
+  <a href="https://pypi.org/project/sd-model-hub/">
+    <img src="https://img.shields.io/pypi/pyversions/sd-model-hub?style=flat&logo=python&logoColor=silver&color=bluegreen&labelColor=grey" alt="Python versions">
+  </a>
+</p>
+
+</div>
 
 Download and manage Stable Diffusion models, from the command line or a web UI.
 
