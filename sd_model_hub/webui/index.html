@@ -7,187 +7,21 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <title>SD Model Hub</title>
     <script>
-      // Apply the light or dark choice before the bundle runs, so there is no flash of the wrong
-      // theme, and keep the locale for the starting screen's one line of text.
+      // Apply the light or dark choice before the bundle runs, so there is no flash of the wrong theme.
       (function () {
-        var prefs = {};
         try {
-          prefs = JSON.parse(localStorage.getItem('sd-model-hub:preferences') || '{}');
-        } catch (e) {
-          prefs = {};
-        }
-        try {
+          var prefs = JSON.parse(localStorage.getItem('sd-model-hub:preferences') || '{}');
           var mode = prefs.theme || 'system';
           var dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.dataset.theme = dark ? 'dark' : 'light';
         } catch (e) {
           document.documentElement.dataset.theme = 'light';
         }
-        var locale = prefs.locale || ((navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh-CN' : 'en');
-        window.__bootStatus = locale === 'zh-CN' ? '正在启动…' : 'Starting…';
       })();
     </script>
-    <style>
-      /* The starting screen. It is inline because it must be painted before the bundle loads, and
-         it carries its own colours for the same reason: the design tokens arrive with the bundle. */
-      #boot {
-        --boot-surface: #f6f7fb;
-        --boot-on-surface: #1b1d22;
-        --boot-muted: #5c6270;
-        --boot-accent: #4a6fa5;
-        --boot-accent-soft: #93b1e3;
-        position: fixed;
-        inset: 0;
-        z-index: 2147483000;
-        display: grid;
-        place-items: center;
-        background: var(--boot-surface);
-        color: var(--boot-on-surface);
-        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif;
-        /* Held back a moment: a bundle already in the cache should not flash a loader. */
-        animation: boot-in 240ms cubic-bezier(0.05, 0.7, 0.1, 1) 120ms both;
-        transition: opacity 320ms cubic-bezier(0.3, 0, 0.8, 0.15);
-      }
-      :root[data-theme='dark'] #boot {
-        --boot-surface: #101318;
-        --boot-on-surface: #e4e7ee;
-        --boot-muted: #969dad;
-        --boot-accent: #a8c3f0;
-        --boot-accent-soft: #4a6fa5;
-      }
-      #boot.boot-done {
-        opacity: 0;
-        pointer-events: none;
-      }
-      .boot-stack {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 22px;
-        padding: 24px;
-      }
-      .boot-mark {
-        position: relative;
-        width: 96px;
-        height: 96px;
-        display: grid;
-        place-items: center;
-      }
-      /* The glow sits behind everything and breathes, so the mark never looks frozen. */
-      .boot-glow {
-        position: absolute;
-        inset: -18%;
-        border-radius: 50%;
-        background: radial-gradient(closest-side, var(--boot-accent-soft), transparent 70%);
-        opacity: 0.35;
-        filter: blur(14px);
-        animation: boot-breathe 2600ms cubic-bezier(0.2, 0, 0, 1) infinite;
-      }
-      /* A conic sweep masked into a ring: one comet chasing the mark. */
-      .boot-ring {
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        background: conic-gradient(from 0turn, transparent 0turn, var(--boot-accent-soft) 0.55turn, var(--boot-accent) 1turn);
-        -webkit-mask: radial-gradient(closest-side, transparent 0 76%, #000 78%);
-        mask: radial-gradient(closest-side, transparent 0 76%, #000 78%);
-        animation: boot-spin 1150ms linear infinite;
-      }
-      .boot-ring::after {
-        /* The head of the comet, so the sweep reads as motion rather than as a gradient. */
-        content: '';
-        position: absolute;
-        top: 1px;
-        left: 50%;
-        width: 6px;
-        height: 6px;
-        margin-left: -3px;
-        border-radius: 50%;
-        background: var(--boot-accent);
-      }
-      .boot-icon {
-        width: 40px;
-        height: 40px;
-        color: var(--boot-accent);
-        /* 220 comfortably exceeds the drawn length, so the stroke sweeps in and out. */
-        stroke-dasharray: 220;
-        animation: boot-draw 2600ms cubic-bezier(0.2, 0, 0, 1) infinite;
-      }
-      .boot-title {
-        margin: 0;
-        font-size: 17px;
-        font-weight: 600;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        background: linear-gradient(100deg, var(--boot-on-surface) 30%, var(--boot-accent) 50%, var(--boot-on-surface) 70%);
-        background-size: 300% 100%;
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        animation: boot-shimmer 2800ms cubic-bezier(0.2, 0, 0, 1) infinite;
-      }
-      .boot-status {
-        margin: -10px 0 0;
-        font-size: 13px;
-        color: var(--boot-muted);
-        /* Only after a moment: on a fast start nobody needs to be told the app is starting. */
-        animation: boot-fade 600ms ease 900ms both;
-      }
-      @keyframes boot-in {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes boot-spin {
-        to { transform: rotate(1turn); }
-      }
-      @keyframes boot-breathe {
-        0%, 100% { opacity: 0.25; transform: scale(0.92); }
-        50% { opacity: 0.5; transform: scale(1.04); }
-      }
-      @keyframes boot-draw {
-        0% { stroke-dashoffset: 220; opacity: 0.35; }
-        45% { stroke-dashoffset: 0; opacity: 1; }
-        85% { stroke-dashoffset: -220; opacity: 0.35; }
-        100% { stroke-dashoffset: -220; opacity: 0.35; }
-      }
-      @keyframes boot-shimmer {
-        from { background-position: 120% 0; }
-        to { background-position: -120% 0; }
-      }
-      @keyframes boot-fade {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        /* The same screen without motion: the ring holds still and only the opacity moves. */
-        #boot, .boot-glow, .boot-ring, .boot-icon, .boot-title, .boot-status {
-          animation: boot-fade 400ms ease both;
-        }
-        .boot-icon { stroke-dasharray: none; }
-        .boot-title { color: var(--boot-on-surface); background: none; -webkit-background-clip: border-box; background-clip: border-box; }
-      }
-    </style>
   </head>
   <body>
     <div id="app"></div>
-    <div id="boot" role="status" aria-live="polite">
-      <div class="boot-stack">
-        <div class="boot-mark">
-          <span class="boot-glow"></span>
-          <span class="boot-ring"></span>
-          <svg class="boot-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-            <path d="M3.3 7 12 12l8.7-5" />
-            <path d="M12 22V12" />
-          </svg>
-        </div>
-        <p class="boot-title">SD Model Hub</p>
-        <p class="boot-status" id="boot-status">Starting…</p>
-      </div>
-    </div>
-    <script>
-      document.getElementById('boot-status').textContent = window.__bootStatus || 'Starting…';
-    </script>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

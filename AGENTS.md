@@ -17,9 +17,8 @@ What it does:
   resume, SHA256 verification, preview images and metadata sidecars.
 - **Hubs:** download files or whole repositories from Hugging Face (and mirrors such as
   hf-mirror) and ModelScope, through their own libraries.
-- **Link:** download any http(s) address typed by hand into a folder chosen by hand — the
-  `url` form of a download job, with the optional file name and SHA256 the CLI's
-  `download url` takes.
+- **Link:** download any http(s) address typed by hand into a folder chosen by hand, with an
+  optional file name and SHA256 — the `url` form of a download job.
 - **Library:** manage ComfyUI and Stable Diffusion WebUI model folders — identify each model's
   kind and base architecture from the file header, browse with previews, and import, move,
   rename and delete models together with their companion files.
@@ -71,11 +70,10 @@ JSON and the CLI's `--json` have the same shape.
 
 **Pydantic compatibility:** the dependency has no version constraint. `core/record.py` supplies
 the project's v2-style model methods and computed-property serialization on native v1 models;
-v2 uses its native implementation. Keep nested events, `can_pause`, persistence exclusions and
-hash validation working on both versions. Pydantic v1 needs Python 3.10–3.13 and FastAPI <0.126;
-the release workflow tests it separately on Python 3.10 and 3.13, including ty. Run the full
-`scripts/dev.py check` and generate the committed API types with v2: v1 has a different JSON
-Schema format and cannot distinguish validation schemas from serialization schemas.
+v2 uses its own. Keep nested events, `can_pause`, persistence exclusions and hash validation
+working on both. Pydantic v1 needs Python 3.10–3.13 and FastAPI <0.126, and the release workflow
+tests it separately there, ty included. Run `check` and generate the committed API types under
+v2: v1's JSON Schema differs and cannot tell a validation schema from a serialization one.
 
 ## 3. Commands
 
@@ -91,18 +89,17 @@ python scripts/build_wheel.py      # web UI, then wheel and sdist
 ```
 
 There is no Makefile on purpose: this project is developed on Windows as often as on Linux.
-The web UI uses **bun**. Always finish a change with `python scripts/dev.py check`.
+The web UI uses **bun**. **`python scripts/dev.py check` is what CI runs, and it must pass before
+you call a change done.**
 
-**Releasing** is `.github/workflows/release.yml`, on a push to `main` changing
-`sd_model_hub/version.py`, a `v*` tag, or a manual run: tests and ty checks on Python 3.10–3.14, the
-web tests and type-check, the generated-types check, then any tag is compared with
-`sd_model_hub/version.py`, the wheel is built with the UI inside it and checked (UI present,
-rules present, installs, runs), and only then published to PyPI by running Twine directly on the
-runner, without Docker. Authentication uses `TWINE_USERNAME=__token__` and the GitHub Actions
-secret `TWINE_PASSWORD` (a PyPI API token); no OIDC permission is needed. Uploads use
-`--skip-existing --non-interactive`. All triggers publish to PyPI; only tag runs create a GitHub release.
-For a version change, bump `VERSION`, commit and push to `main`. Python 3.10 is the floor, so `typing.Self`,
-`tomllib` without the `tomli` fallback and other 3.11+ APIs are out.
+**Releasing** (`.github/workflows/release.yml`) runs on a push to `main` changing
+`sd_model_hub/version.py`, on a `v*` tag, or by hand: every check above, then the wheel is built
+with the UI inside it and verified (UI present, rules present, installs, runs), and only then
+published to PyPI with Twine on the runner — `TWINE_USERNAME=__token__`, the `TWINE_PASSWORD`
+secret, no OIDC, `--skip-existing --non-interactive`. A tag must match `sd_model_hub/version.py`;
+every trigger publishes, only a tag also creates a GitHub release. So a release is: bump
+`VERSION`, commit, push to `main`. Python 3.10 is the floor, so `typing.Self`, `tomllib` without
+the `tomli` fallback and other 3.11+ APIs are out.
 
 ## 4. Conventions
 
@@ -179,10 +176,10 @@ least one under `decoder`, and no T5 marker), text encoder (exact marker keys su
 `encoder.block.0.layer.0.SelfAttention.q.weight`), bare diffusion model (marker keys under no
 prefix, or under `model.diffusion_model.`, `model.` or `net.`), upscaler.
 
-A rule carries `required_keys`, `absent_keys`, `any_key_prefixes`, `shapes`, `regex_shapes`,
-`prediction`, `priority` and `confidence`. Adding an architecture means adding a rule, not code.
-Results are cached in the `file_index` table by path, size and mtime, so deleting the database
-only costs time. When the detected kind disagrees with the folder or a sidecar, the entry is
+A rule carries `kinds`, `required_keys`, `absent_keys`, `any_key_prefixes`, `shapes`,
+`regex_shapes`, `prediction`, `priority` and `confidence`. Adding an architecture means adding a
+rule, not code. Results are cached in the `file_index` table by path, size and mtime, so deleting
+the database only costs time. When the detected kind disagrees with the folder or a sidecar, the entry is
 flagged rather than one of them winning.
 
 These rules were run over 555 real files in local ComfyUI and Forge installs; the fixtures in
@@ -196,17 +193,22 @@ reimplemented; never copy code from it.
 ## 7. The library
 
 A **root** is a folder plus a layout preset. Layout maps folder names to kinds and is a hint and a
-default download destination, never an override of detection.
+default download destination, never an override of detection. The three presets are tables in
+`library/layouts.py`, which is where the full lists live; what matters here is how they behave:
 
-- `comfyui`: `checkpoints`, `loras`, `vae`, `text_encoders` (alias `clip`), `diffusion_models`
-  (alias `unet`), `controlnet` (alias `t2i_adapter`), `clip_vision`, `upscale_models`,
-  `embeddings`, `hypernetworks`, `style_models`, `vae_approx`, and more. Each also works under a
-  `models/` prefix, so a root may be the install folder or its `models` folder.
-- `sd-webui`: `models/Stable-diffusion`, `models/Lora`, `models/LyCORIS`, `models/VAE`,
-  `models/VAE-approx`, `models/text_encoder`, `models/ControlNet`, `models/hypernetworks`, the
-  upscaler folders (`ESRGAN`, `RealESRGAN`, `DAT`, `SwinIR`, `ScuNET`, `LDSR`, `BSRGAN`) — and
-  `embeddings`, which sits **beside** `models/`, so a WebUI root is the installation folder.
+- `comfyui`: `checkpoints`, `loras`, `vae`, `text_encoders`, `diffusion_models`, … plus the
+  legacy aliases (`clip`, `unet`, `t2i_adapter`) that stand for the same kinds.
+- `sd-webui`: `models/Stable-diffusion`, `models/Lora` and `models/LyCORIS`, the upscaler
+  folders, … and `embeddings`, which sits **beside** `models/`, so a WebUI root is the
+  installation folder.
 - `custom`: no mapping.
+
+Every name also works under a `models/` prefix, so a root may be an install folder or its
+`models` folder.
+
+**Kind filters apply to models**, while folders stay visible so the screen can still be
+navigated. The Library lists roots without a kind hint before the ones dedicated to a single
+kind, keeping the configured order within each group, and opens on the first (§12).
 
 **Companions.** A model's companions are the files sharing its stem, assigned to the longest
 matching stem so `a.b.png` belongs to `a.b.safetensors` and not to `a.safetensors`. Every
@@ -229,8 +231,7 @@ file no model claimed as a companion is listed as well, so a folder can be manag
 file manager. Such an entry carries `is_model: false`: it is never detected, has no sidecar hint,
 never counts towards `pending_detection`, is skipped by `walk_models` and by a kind filter, and
 shows a file icon and its extension in the interface. Move, rename and delete work on it as on
-anything else inside a root. `GET /api/v1/library/locate?path=` names the root holding an absolute
-path, which is how a finished download's folder is opened in the library.
+anything else inside a root.
 
 **Deleting** goes to the system trash through `send2trash`, which works on a headless machine: it
 falls back to its own implementation of the FreeDesktop specification, moving the file to
@@ -240,15 +241,19 @@ used instead. On a server nobody empties the trash, so the settings page names t
 offers permanent deletion.
 
 **Path safety** is one function every operation calls (`library/safety.py`): components are
-validated (no `..`, no separators, no control characters, no Windows-reserved names, no trailing
-dot or space), and the result must stay inside the root. `library.follow_symlinks` is **on by
-default**: a linked model folder is what the user put there — a WebUI's LoRAs on another disk —
-and hiding it only looks like the files are missing. Following a link keeps the path relative to
-the root, walks a loop of links only once, and makes operations act on the files where they
-really are. The setting covers browsing, the download destination and every file operation
-together: a folder that can be opened can also be downloaded into. Turned off, a path that a link
-leads outside its root is refused, and both folders and model files it leads out are hidden from
-listings — listing something that cannot be opened only moves the error to the way in.
+validated (no `..`, no absolute paths, no separators, no control characters, no Windows-reserved
+names, no trailing dot or space), and the result must stay inside the root — "inside" meaning
+reachable from the root by a path the client may write, a link the user put inside it included.
+
+`library.follow_symlinks` is **on by default**: a linked model folder is what the user put there
+— a WebUI's LoRAs on another disk — and hiding it only looks like the files are missing.
+Following a link keeps the path relative to the root, walks a loop of links only once, and makes
+operations act on the files where they really are. The setting covers browsing, the download
+destination and every file operation together: a folder that can be opened can also be downloaded
+into. Turned off, a path that a link leads outside its root is refused, and both folders and model
+files it leads out are hidden from listings — listing something that cannot be opened only moves
+the error to the way in.
+
 Nothing is ever overwritten: a clash raises `ConflictError`, and callers may ask for an automatic
 numeric suffix.
 
@@ -337,10 +342,11 @@ and declare `capabilities` so the filter bar only offers filters that work.
   scope is the bitmask `5` (`UserRead | ModelsRead`), which covers browsing and downloading; ask
   for more only when an actual call needs it. Access tokens last about an hour and refresh
   tokens about thirty days, but the values from the token response are what count. Device Flow
-  exists as a later option for remote or CLI-only use; it is not implemented. Transactions are single-use, live five minutes, and are bound to the
-  browser that started them by an HttpOnly, SameSite=Lax cookie. Tokens go to the OS credential
-  store when available, else an owner-only file. They refresh a minute before expiry, once even
-  across threads and processes (file lock), and the rotated pair is stored whole.
+  exists as a later option for remote or CLI-only use; it is not implemented. Transactions are
+  single-use, live five minutes, and are bound to the browser that started them by an HttpOnly,
+  SameSite=Lax cookie. Tokens go to the OS credential store when available, else an owner-only
+  file. They refresh a minute before expiry, once even across threads and processes (file lock),
+  and the rotated pair is stored whole.
 
 The method changes only when the user saves a manual token, completes an authorization, or asks
 explicitly. **A failure, a disconnection or an expiry must never switch method** — the other
@@ -361,6 +367,8 @@ says so while it applies.
   required in the output schema so generated types match what the server actually sends.
 - **Uploads** (`PUT /api/v1/library/upload`) take the raw request body, not multipart, and stream
   straight into a `.part` file. Nothing is spooled to a temporary directory.
+- **`GET /api/v1/library/locate?path=`** names the root holding an absolute path, so a client can
+  open a folder it only knows by its place on disk — a finished download's, for instance.
 - **socket.io** is mounted at `/ws` (path `/ws/socket.io`); traffic is server to client only. REST
   stays the source of truth: events invalidate or patch the cache, and a reconnect refetches.
   A job event carries a **snapshot** of the job, never the live object the worker keeps writing
@@ -398,8 +406,16 @@ one build works under any sub-path; the API base URL is derived from the running
 and Vite's `base` is `'./'` so assets resolve wherever the app is mounted. Fonts and icons are
 bundled: nothing is fetched from a third-party origin at run time, except preview images, which
 load straight from each source's CDN, and the images a hub model card embeds, which load lazily
-with no referrer. Model cards are rendered with markdown-it (`src/markdown.ts`) with raw HTML
-on, then sanitised with DOMPurify before they reach the page.
+with no referrer.
+
+**Text from a source is never trusted as HTML.** A model description is rendered as text. A hub
+model card is Markdown, rendered through `src/markdown.ts`: cards need HTML for what Markdown
+cannot express (centred banners, image rows, `<details>`), so markdown-it's `html` option is on
+and the output is sanitised with DOMPurify against the allowlist in that file — document markup
+only, no `class` or `style`, and every link and image hardened the same way whether it came from
+Markdown or from a raw tag. Nothing reaches `v-html` unsanitised; `markdown.test.ts` holds that
+promise. Widen the allowlist only for tags that cannot execute, load a script, frame another
+page, or restyle the app.
 
 Material Design 3 in two layers. Colour roles are generated from one source colour with
 `@material/material-color-utilities` (Tonal Spot, light and dark, contrast level) and written to
@@ -425,22 +441,15 @@ into one column, rows of controls wrap, and long names get `overflow-wrap: anywh
 the image gallery scrolls sideways, and nested vertical scroll areas are dropped below 600 px so
 the sheet itself takes the gesture.
 
-Preferences (theme, source colour, contrast, language, last source and root, view mode) are client
-state: `localStorage` plus the server's client-state endpoint, with an early script in
+Preferences (theme, source colour, contrast, language, last source, hub and root, view mode) are
+client state: `localStorage` plus the server's client-state endpoint, with an early script in
 `index.html` applying the theme before the bundle loads to avoid a flash.
-
-**The starting screen** lives in `index.html`, inline, because it is painted before the bundle
-exists: a masked conic ring around the app mark drawing itself, the wordmark, and one line of
-text in the stored locale. It carries its own colours for both themes for the same reason — the
-design tokens arrive with the bundle — and it fades in after 120 ms so a cached start shows no
-loader at all. `main.ts` fades it out after `mount()` and removes it, with a timer in case the
-transition never fires. Under `prefers-reduced-motion` it is a plain fade.
 
 Uploads reach the library two ways: files or a whole folder dropped on the screen, and the same
 through the system file picker behind the **Upload** button, which uses one throwaway
 `<input type="file">` (`webkitdirectory` for a folder, `webkitRelativePath` for the structure).
-A finished download offers **Show in the library**, which opens the folder it landed in — through
-`locate` when the job was given an absolute folder and so carries no root.
+A finished download offers **Show in the library**, which opens the folder it landed in, asking
+`locate` (§10) when the job was given an absolute folder and so carries no root.
 
 In development, Vite proxies `/api`, `/openapi.json` and `/ws`. Proxy failures that mean "the API
 server is restarting" (ECONNRESET, ECONNREFUSED, EPIPE…) are collapsed into one throttled line by
@@ -449,7 +458,8 @@ a custom logger; everything else is still printed in full.
 ## 12. Embedding in another application
 
 `sd_model_hub/embed.py` is the public façade, re-exported lazily from the package so
-`sd-model-hub version` does not pay for FastAPI:
+`sd-model-hub version` does not pay for FastAPI. Its module docstring carries the worked example;
+in short:
 
 ```python
 from sd_model_hub import ModelHubServer, ModelRoot
@@ -468,8 +478,8 @@ How each part works, so it stays that way:
 - **Locked roots.** `LibraryService.roots_locked` makes add, update and remove raise
   `ConflictError`; `GET /app/meta` reports `roots_locked` and the interface hides the actions.
   Unlocked roots are merely seeded at start-up, so the user may add their own.
-- **Ports.** `port=0` binds any free port; a number moves up on collision unless `strict_port`.
-  The socket is bound before the app starts, so the port that was tested is the one served.
+- **Ports.** `port=0` binds any free port, a number asks for that one, `None` takes the settings'
+  port; binding works as in §10.
 - **Prefix.** `create_app(api_prefix=…)` moves the API, the socket and the static UI under one
   path. The web UI needs no change: it derives its base URL from its own script's URL. Security
   paths (public health, the OAuth callback exemption, protected prefixes) are built from the
@@ -481,6 +491,8 @@ How each part works, so it stays that way:
   per kind. UI suggestions and downloads share `LibraryService.suggest_destination`; explicit
   destinations win and invalid configured targets fail rather than falling back. Explicit host
   IDs survive seeding, and generated host IDs must not depend on Python's randomized `hash()`.
+  A host that exposes a whole model directory must register it as a root of its own with no kind
+  hint: the Library then leads with it and opens on it, ahead of the per-kind folders (§7).
 - **Direct ASGI embedding.** A host can mount `create_app(services)` without another listener.
   It owns entering/exiting the child lifespan on its event loop and closing the services, and
   must protect both HTTP and WebSocket access using its own authentication. Mounted security
@@ -490,7 +502,7 @@ How each part works, so it stays that way:
 
 ## 13. Testing
 
-Both suites run offline. `python scripts/dev.py check` must pass before you call a change done.
+Both suites run offline.
 
 - **Python (pytest):** detection against real saved headers plus synthetic ones; path safety
   (traversal, absolute paths, symlink escapes, reserved names, clashes); library operations in a
@@ -501,8 +513,11 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
   revocation, the manual/OAuth matrix, no credential in any response); the API with `TestClient`;
   the CLI with `CliRunner`, including a snapshot of the whole command tree; the architecture rule.
 - **Web (vitest + vue-tsc):** the base-URL helper, `ui/` components, theme generation, i18n,
-  formatting, the no-literal-colours and absolute-import rules, the dev proxy filter, and the
-  model-card sanitising. The default environment is happy-dom, but DOMPurify is a no-op there
+  formatting, the no-literal-colours and absolute-import rules, the dev proxy filter, the
+  model-card sanitising, the download cache's event ordering, and the views and components whose
+  logic is worth holding — the destination picker, the link form, the library screen and a
+  download row — mounted with `@vue/test-utils` and their queries and stores mocked. The default
+  environment is happy-dom, but DOMPurify is a no-op there
   (its walk stops when happy-dom's `NodeIterator` loses the removed walk root), so
   `markdown.test.ts` sets `@vitest-environment jsdom` in its docblock. Any future test that
   renders a model card needs the same line, or it will assert against unsanitised HTML.
@@ -511,52 +526,41 @@ Both suites run offline. `python scripts/dev.py check` must pass before you call
 
 ## 14. Invariants worth keeping
 
-- `core` imports no web or CLI framework; the API and CLI stay thin.
-- Never unpickle a model file. Never copy code from ComfyUI (GPL-3.0).
-- Never overwrite a user's file silently; never delete outside a root, where "inside a root" means
-  reachable from it by a path the client may write — a link the user put inside a root included,
-  while `library.follow_symlinks` is on. `..`, absolute paths and reserved names stay refused.
+One line each; the section in brackets explains why.
+
+- `core` imports no web or CLI framework, and the API and CLI stay thin. [§2]
+- Never unpickle a model file, and never copy code from ComfyUI (GPL-3.0). [§6]
+- Never overwrite a user's file silently, and never write or delete outside a root. [§7]
 - A credential is never returned to a client, written into a job record, logged, or sent to a host
-  other than the one it belongs to.
-- Text from a source is never trusted as HTML. A model description is rendered as text. A hub
-  model card is Markdown, rendered through `webui/src/markdown.ts`. Model cards need HTML for
-  what Markdown cannot express (centred banners, image rows, `<details>`), so markdown-it's
-  `html` option is on and the output is sanitised with DOMPurify against the allowlist in that
-  file: document markup only, no `class` or `style`, and every link and image hardened the same
-  way whether it came from Markdown or from a raw tag. Nothing reaches `v-html` unsanitised;
-  `markdown.test.ts` holds that promise. Widen the allowlist only for tags that cannot execute,
-  load a script, frame another page, or restyle the app.
+  other than the one it belongs to. [§5, §9]
+- Manual API tokens keep working with no OAuth configured, and nothing switches authentication
+  method by itself. [§9]
+- Nothing from a source reaches `v-html` unsanitised, and no source's text is trusted as HTML.
+  [§11]
+- Hub downloads cannot pause; do not add a pause button that promises otherwise. [§8]
+- The generated `schema.d.ts` is committed and regenerated whenever the API changes. [§10]
+- A host application's pinned settings and locked model folders cannot be overridden from the UI,
+  the API or the command line. [§12]
 - `websockets` stays a declared dependency: uvicorn speaks WebSocket only with it or `wsproto`,
   and without one the socket silently drops to long polling.
-- Manual API tokens keep working with no OAuth configured, and nothing switches authentication
-  method by itself.
-- Hub downloads cannot pause; do not add a pause button that promises otherwise.
-- The generated `schema.d.ts` is committed and regenerated whenever the API changes.
-- A host application's pinned settings and locked model folders cannot be overridden from the UI,
-  the API or the command line.
 - An anchored menu renders at the end of the document, never inside a card or row that clips it.
-- Library kind filters apply to models, while folders remain visible for navigation. Hosts that
-  expose an entire model directory must register that directory explicitly as a root with no kind hint.
-  The Library lists roots without a kind hint before the ones dedicated to a single kind, keeping
-  the configured order within each group, and opens on the first: with a host that seeds a folder
-  per kind, the complete model directory leads the list and is what the screen shows first.
 
 ## 15. Known gaps
 
 - No Civitai OAuth application is registered, so OAuth is unconfigured by default and the real
   authorization, refresh, revocation and authenticated download paths are untested. Device Flow is
-  not implemented.
-- Civitai downloads of login-gated files were never tried with a real token, and no complete
-  Civitai file was ever downloaded end to end (they run to hundreds of megabytes). The flow is
-  covered by a mock test, including the token being dropped on the redirect to storage.
+  not implemented. Civitai downloads of login-gated files were never tried with a real token
+  either, and no complete Civitai file was ever downloaded end to end (they run to hundreds of
+  megabytes); a mock test covers the flow, including the token being dropped on the redirect to
+  storage.
 - ControlNet, embedding and upscaler detection rules have only synthetic fixtures.
 - hf-mirror and Gitee AI endpoints were never tested from a network that needs them.
-- Drag-and-drop upload and the file-picker upload are covered at the API level and in unit tests,
+- Uploads — dropped files and the file picker — are covered at the API level and in unit tests,
   not by dropping or choosing a file in a real browser.
 - The Windows credential store, and the app on Windows generally, is untested.
-- The root `LICENSE` is the GPLv3 text copied from `sd-webui-all-in-one`.
-- **Before the first release:** the project has no `license` or `urls` metadata, and publishing
-  needs the `TWINE_PASSWORD` secret plus the `pypi` environment. The
-  name `sd-model-hub` was free on PyPI when last checked.
+- **Packaging:** the root `LICENSE` is the GPLv3 text copied from `sd-webui-all-in-one`, and
+  `pyproject.toml` declares no `license` and no `urls`, so the published releases carry neither.
+  Releasing itself works — 0.1.5–0.1.9 are on PyPI, published from `main` — but no `v*` tag has
+  ever been pushed, so the tag check and the GitHub release job have never run.
 - "Select similar models" from the original plan is implemented as filters for kind and base
   model; nobody has confirmed that is what was meant.

@@ -17,12 +17,3 @@ const queryClient = new QueryClient({
 });
 
 createApp(App).use(createPinia()).use(router).use(VueQueryPlugin, { queryClient }).mount('#app');
-
-// The starting screen in index.html fades out once the interface is on the page.
-const boot = document.getElementById('boot');
-if (boot) {
-  requestAnimationFrame(() => boot.classList.add('boot-done'));
-  boot.addEventListener('transitionend', () => boot.remove(), { once: true });
-  // A browser that skips the transition, or a tab in the background, must not keep the overlay.
-  setTimeout(() => boot.remove(), 1500);
-}
