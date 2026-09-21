@@ -432,6 +432,15 @@ and tabs, `container` for card-to-dialog, `sheet` for drawers, `list` for grids 
 capped), `collapse`, `snackbar`. Under `prefers-reduced-motion` everything becomes a short fade and
 ripples are off. Navigation follows the window size classes: bottom bar below 600 px, rail above.
 
+**The Hubs detail pane** uses that system rather than appearing and vanishing: `shared-axis-x`
+carries it in from the right and back out (`--axis-dir` is flipped when closing), the pane leaves
+inside its own column instead of the motion's default full-width absolute position, and the
+column is held by a leaving flag until the pane is gone so the list widens after it rather than
+under it. Both column states declare two tracks, so the widths interpolate; where the list is
+hidden below 900 px the open state must keep the sized track **first**, because the hidden list
+is out of the grid and the pane is then the first item. Picking another repository while the pane
+is open is a `fade-through` on the pane's content, which is keyed by repository id.
+
 **Dialogs on a phone.** `AppDialog` becomes a bottom sheet below 600 px, with the phone's own
 gutters and `env(safe-area-inset-bottom)` under the last row. Its centring grid declares
 `minmax(0, 1fr)`: with the default `auto` track, a panel whose content has a wide minimum — a long
@@ -440,6 +449,12 @@ dialog off screen. Inside a dialog the same rule applies to every row: label-and
 into one column, rows of controls wrap, and long names get `overflow-wrap: anywhere`. Nothing but
 the image gallery scrolls sideways, and nested vertical scroll areas are dropped below 600 px so
 the sheet itself takes the gesture.
+
+**A row that pairs a name with a control needs `min-width: 0` on the item holding the text.** A
+model file name is one long unbreakable word, so the row's min-content width is the whole name,
+and a flex item keeps `min-width: auto` by default: the card's overflow menu was pushed out and
+clipped away, and the snackbar's buttons went off the screen. `layout.test.ts` lists the rows
+that carry a name and holds the rule.
 
 Preferences (theme, source colour, contrast, language, last source, hub and root, view mode) are
 client state: `localStorage` plus the server's client-state endpoint, with an early script in

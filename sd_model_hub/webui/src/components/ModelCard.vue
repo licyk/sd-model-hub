@@ -56,14 +56,16 @@ defineExpose({ rect: () => card.value?.el?.getBoundingClientRect() ?? null });
 .model-card { height: 100%; }
 .media { position: relative; }
 .select-slot { position: absolute; top: var(--app-space-1); left: var(--app-space-1); }
-.body { display: flex; align-items: flex-start; gap: var(--app-space-1); padding: var(--app-space-3) var(--app-space-1) var(--app-space-2) var(--app-space-3); flex: 1; }
+/* min-width: 0 is what keeps the actions on the card: a long file name is one unbreakable word,
+   and without it this row refuses to shrink below that word and pushes the menu out of the card. */
+.body { display: flex; align-items: flex-start; gap: var(--app-space-1); padding: var(--app-space-3) var(--app-space-1) var(--app-space-2) var(--app-space-3); flex: 1; min-width: 0; }
 .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .title { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subtitle { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--app-space-1); margin-top: var(--app-space-1); }
 .badges :deep(.badge) { height: 20px; padding: 0 var(--app-space-2); border-radius: var(--md-sys-shape-corner-small); }
 .warn { color: var(--md-sys-color-error); display: inline-flex; }
-.actions { display: flex; flex-direction: column; }
+.actions { display: flex; flex-direction: column; flex: none; }
 .list { flex-direction: row; align-items: center; }
 .list .media { width: 56px; flex: none; border-radius: var(--md-sys-shape-corner-small); overflow: hidden; }
 .list .body { align-items: center; padding: var(--app-space-1) var(--app-space-1) var(--app-space-1) var(--app-space-3); }

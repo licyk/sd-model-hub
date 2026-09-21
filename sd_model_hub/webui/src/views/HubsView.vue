@@ -38,6 +38,10 @@ const items = computed(() => search.data.value?.pages.flatMap((p) => p.items) ??
 
 // Opening a repository
 const repoId = ref<string | null>(null);
+// The pane slides in from the right and back out the same way, and its column stays until it is
+// gone, so the list widens once the pane has left rather than under it.
+const paneDir = ref(1);
+const paneLeaving = ref(false);
 const revision = ref<string | null>(null);
 const revisionDraft = ref('');
 const repo = useRepo(hub, repoId, revision);
@@ -57,8 +61,14 @@ watch(
 );
 
 function openRepo(id: string) {
+  paneDir.value = 1;
   revision.value = null;
   repoId.value = id;
+}
+
+function closeRepo() {
+  paneDir.value = -1;
+  repoId.value = null;
 }
 
 function openDirect() {
@@ -82,6 +92,7 @@ function openDirect() {
     return;
   }
   if (parts.length >= 4 && ['tree', 'blob', 'resolve', 'files'].includes(parts[2])) rev = parts[3];
+  paneDir.value = 1;
   repoId.value = `${parts[0]}/${parts[1]}`;
   revision.value = rev;
 }
@@ -116,7 +127,7 @@ function queue(dest: Destination) {
   <div class="hubs">
     <Tabs v-model="hub" :tabs="hubTabs" class="tabs" />
     <Transition name="shared-axis-x" mode="out-in">
-      <div :key="hub" class="panes" :class="{ 'has-repo': !!repoId }" :style="{ '--axis-dir': direction }">
+      <div :key="hub" class="panes" :class="{ 'has-repo': !!repoId || paneLeaving }" :style="{ '--axis-dir': direction }">
         <section class="list-pane">
           <div class="controls">
             <SearchField v-model="draft" :placeholder="t('hubs.searchPlaceholder')" @search="query = $event" />
@@ -148,9 +159,14 @@ function queue(dest: Destination) {
           </ModelGrid>
         </section>
 
-        <section v-if="repoId" class="repo-pane">
+        <Transition name="shared-axis-x" @before-leave="paneLeaving = true" @after-leave="paneLeaving = false">
+        <section v-if="repoId" class="repo-pane" :style="{ '--axis-dir': paneDir }">
+          <!-- Keyed on the repository, so picking another one from the list is a fade-through
+               rather than a silent swap of everything but the pane. -->
+          <Transition name="fade-through" mode="out-in">
+          <div :key="repoId" class="repo-content">
           <header class="repo-head">
-            <IconButton :icon="icons.ArrowLeft" :label="t('common.close')" class="back" @click="repoId = null" />
+            <IconButton :icon="icons.ArrowLeft" :label="t('common.close')" class="back" @click="closeRepo" />
             <h2 class="type-title-large repo-title">{{ repoId }}</h2>
             <a v-if="repo.data.value" :href="repo.data.value.page_url" target="_blank" rel="noopener noreferrer" class="ext" :title="t('detail.openPage')">
               <AppIcon :icon="icons.ExternalLink" :size="20" :label="t('detail.openPage')" />
@@ -182,7 +198,10 @@ function queue(dest: Destination) {
               <div class="markdown type-body-medium" v-html="readmeHtml"></div>
             </ExpansionPanel>
           </template>
+          </div>
+          </Transition>
         </section>
+        </Transition>
       </div>
     </Transition>
 
@@ -195,8 +214,15 @@ function queue(dest: Destination) {
 <style scoped>
 .hubs { display: flex; flex-direction: column; height: 100%; }
 .tabs { flex: none; border-radius: var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0 0; overflow: hidden; }
-.panes { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--app-space-4); flex: 1; min-height: 0; padding: var(--app-space-4) var(--app-space-6); }
-.panes.has-repo { grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr); }
+/* Both states declare two tracks so the widths interpolate: the list narrows while the pane
+   arrives instead of jumping under it. */
+.panes {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0fr); column-gap: 0; row-gap: var(--app-space-4);
+  flex: 1; min-height: 0; padding: var(--app-space-4) var(--app-space-6);
+  transition: grid-template-columns var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized),
+    column-gap var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+}
+.panes.has-repo { grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr); column-gap: var(--app-space-4); }
 .list-pane, .repo-pane {
   display: flex; flex-direction: column; gap: var(--app-space-3); min-width: 0; overflow: auto;
   /* Keep the scrollbar off the content, and reserve its width so nothing shifts when it appears. */
@@ -216,10 +242,14 @@ function queue(dest: Destination) {
 .repo-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .repo-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repo-pane { padding: var(--app-space-4); padding-right: var(--app-space-3); border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface); }
+/* The shared-axis motion takes a leaving element out of flow across the whole width; here it
+   leaves inside its own column instead. */
+.repo-pane.shared-axis-x-leave-active { position: static; }
+.repo-content { display: flex; flex-direction: column; gap: var(--app-space-3); min-width: 0; }
 .repo-head { display: flex; align-items: center; gap: var(--app-space-2); }
 .repo-title { flex: 1; margin: 0; overflow-wrap: anywhere; }
 .ext { color: var(--md-sys-color-primary); display: inline-flex; }
-.back { display: none; }
+.back { flex: none; }
 .note { display: flex; align-items: center; gap: var(--app-space-1); margin: 0; }
 .download-row { display: flex; justify-content: flex-end; }
 .markdown { max-height: 400px; overflow: auto; overflow-wrap: anywhere; padding: var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); }
@@ -250,9 +280,9 @@ function queue(dest: Destination) {
 .markdown :deep(figcaption) { color: var(--md-sys-color-on-surface-variant); font-size: 0.9em; }
 p { margin: 0; }
 @media (max-width: 899px) {
-  .panes.has-repo { grid-template-columns: minmax(0, 1fr); }
+  /* The list is hidden here, so the pane is the only item: it must land in the sized track. */
+  .panes.has-repo { grid-template-columns: minmax(0, 1fr) minmax(0, 0fr); column-gap: 0; }
   .panes.has-repo .list-pane { display: none; }
-  .back { display: inline-flex; }
 }
 @media (max-width: 599px) {
   .panes { padding: var(--app-space-3); }

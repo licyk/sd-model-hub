@@ -46,8 +46,10 @@ function act() {
   box-shadow: var(--app-elevation-3); pointer-events: auto;
 }
 .snackbar.error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
-.text { flex: 1; padding: var(--app-space-2) 0; }
-.action { border: 0; background: transparent; color: var(--md-sys-color-inverse-primary); padding: 0 var(--app-space-3); height: 40px; border-radius: var(--md-sys-shape-corner-full); cursor: pointer; font: inherit; font-weight: 500; }
+/* A message may name a file: let the name wrap instead of pushing the action and the close
+   button out of the bar. */
+.text { flex: 1; min-width: 0; padding: var(--app-space-2) 0; overflow-wrap: anywhere; }
+.action { flex: none; border: 0; background: transparent; color: var(--md-sys-color-inverse-primary); padding: 0 var(--app-space-3); height: 40px; border-radius: var(--md-sys-shape-corner-full); cursor: pointer; font: inherit; font-weight: 500; }
 .snackbar.error .action { color: var(--md-sys-color-on-error-container); }
 .close { --md-icon-button-icon-color: currentColor; color: inherit; }
 </style>
