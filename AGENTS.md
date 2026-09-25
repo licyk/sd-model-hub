@@ -408,8 +408,9 @@ bundled: nothing is fetched from a third-party origin at run time, except previe
 load straight from each source's CDN, and the images a hub model card embeds, which load lazily
 with no referrer.
 
-**Text from a source is never trusted as HTML.** A model description is rendered as text. A hub
-model card is Markdown, rendered through `src/markdown.ts`: cards need HTML for what Markdown
+**Text from a source is never trusted as HTML.** A Browse model description (HTML from Civitai,
+Markdown from GitHub and OpenModelDB) and a hub model card both go through
+`components/MarkdownContent.vue`, which renders with `src/markdown.ts`: cards need HTML for what Markdown
 cannot express (centred banners, image rows, `<details>`), so markdown-it's `html` option is on
 and the output is sanitised with DOMPurify against the allowlist in that file — document markup
 only, no `class` or `style`, and every link and image hardened the same way whether it came from
@@ -534,7 +535,7 @@ Both suites run offline.
   download row — mounted with `@vue/test-utils` and their queries and stores mocked. The default
   environment is happy-dom, but DOMPurify is a no-op there
   (its walk stops when happy-dom's `NodeIterator` loses the removed walk root), so
-  `markdown.test.ts` sets `@vitest-environment jsdom` in its docblock. Any future test that
+  `markdown.test.ts` and `MarkdownContent.test.ts` set `@vitest-environment jsdom` in their docblocks. Any future test that
   renders a model card needs the same line, or it will assert against unsanitised HTML.
 - Tests that need the network are marked `live` and deselected by default.
 - When you fix a bug, add the test that would have caught it.

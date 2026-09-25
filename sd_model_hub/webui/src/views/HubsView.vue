@@ -3,11 +3,11 @@ import { computed, ref, watch } from 'vue';
 import { useCreateDownload } from '@/api/queries/downloads';
 import { useHubs, useRepo, useRepoSearch } from '@/api/queries/hubs';
 import DestinationPicker, { type Destination } from '@/components/DestinationPicker.vue';
+import MarkdownContent from '@/components/MarkdownContent.vue';
 import ModelGrid from '@/components/ModelGrid.vue';
 import RepoFileTree from '@/components/RepoFileTree.vue';
 import { formatBytes, formatCount, formatDate } from '@/format';
 import { useI18n } from '@/i18n';
-import { renderMarkdown } from '@/markdown';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePreferencesStore } from '@/stores/preferences';
 import { AppButton, AppIcon, Badge, EmptyState, ExpansionPanel, IconButton, SearchField, SelectField, Skeleton, Tabs, TextField, icons, useSnackbar } from '@/ui';
@@ -100,7 +100,6 @@ function openDirect() {
 const selectedSize = computed(() => (repo.data.value?.files ?? []).filter((f) => selection.value.includes(f.path)).reduce((a, f) => a + (f.size ?? 0), 0));
 const readme = computed(() => (repo.data.value?.description ?? '').replace(/^---[\s\S]*?---\s*/, '').slice(0, 20000));
 // The model card is Markdown; it is rendered with raw HTML off, so the repository cannot inject any.
-const readmeHtml = computed(() => (readme.value ? renderMarkdown(readme.value) : ''));
 const readmeOpen = ref(false);
 
 const pickerOpen = ref(false);
@@ -194,8 +193,7 @@ function queue(dest: Destination) {
               </AppButton>
             </div>
             <ExpansionPanel v-if="readme" v-model:open="readmeOpen" :label="t('hubs.readme')" :icon="icons.FileText">
-              <!-- Safe: markdown-it's output, sanitised with DOMPurify before it gets here. See src/markdown.ts. -->
-              <div class="markdown type-body-medium" v-html="readmeHtml"></div>
+              <MarkdownContent :text="readme" class="readme" />
             </ExpansionPanel>
           </template>
           </div>
@@ -252,32 +250,7 @@ function queue(dest: Destination) {
 .back { flex: none; }
 .note { display: flex; align-items: center; gap: var(--app-space-1); margin: 0; }
 .download-row { display: flex; justify-content: flex-end; }
-.markdown { max-height: 400px; overflow: auto; overflow-wrap: anywhere; padding: var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container); }
-/* Rendered model card: the tags come from the card itself, so they are styled here rather than in a component. */
-.markdown > :deep(:first-child) { margin-top: 0; }
-.markdown > :deep(:last-child) { margin-bottom: 0; }
-.markdown :deep(h1), .markdown :deep(h2), .markdown :deep(h3), .markdown :deep(h4), .markdown :deep(h5), .markdown :deep(h6) {
-  margin: var(--app-space-4) 0 var(--app-space-2);
-  font-size: var(--md-sys-typescale-title-small-size); line-height: var(--md-sys-typescale-title-small-line-height); font-weight: var(--md-sys-typescale-title-small-weight);
-}
-.markdown :deep(h1), .markdown :deep(h2) { padding-bottom: var(--app-space-1); border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-.markdown :deep(p), .markdown :deep(ul), .markdown :deep(ol), .markdown :deep(blockquote), .markdown :deep(table) { margin: var(--app-space-2) 0; }
-.markdown :deep(ul), .markdown :deep(ol) { padding-left: var(--app-space-5); }
-.markdown :deep(a) { color: var(--md-sys-color-primary); }
-.markdown :deep(code) { padding: 0 4px; border-radius: var(--md-sys-shape-corner-extra-small); background: var(--md-sys-color-surface-container-highest); font-family: ui-monospace, monospace; font-size: 0.9em; }
-.markdown :deep(pre) { margin: var(--app-space-2) 0; padding: var(--app-space-3); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container-highest); overflow: auto; }
-.markdown :deep(pre code) { padding: 0; background: none; }
-.markdown :deep(blockquote) { padding-left: var(--app-space-3); border-left: 3px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface-variant); }
-.markdown :deep(img) { max-width: 100%; height: auto; }
-.markdown :deep(table) { border-collapse: collapse; display: block; overflow: auto; }
-.markdown :deep(th), .markdown :deep(td) { padding: var(--app-space-1) var(--app-space-2); border: 1px solid var(--md-sys-color-outline-variant); }
-.markdown :deep(th:not([align])), .markdown :deep(td:not([align])) { text-align: left; }
-.markdown :deep(hr) { border: 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
-/* Tags a card brings itself rather than through Markdown. */
-.markdown :deep(details) { margin: var(--app-space-2) 0; }
-.markdown :deep(summary) { cursor: pointer; font-weight: var(--md-sys-typescale-title-small-weight); }
-.markdown :deep(figure) { margin: var(--app-space-2) 0; }
-.markdown :deep(figcaption) { color: var(--md-sys-color-on-surface-variant); font-size: 0.9em; }
+.readme { max-height: 400px; overflow: auto; }
 p { margin: 0; }
 @media (max-width: 899px) {
   /* The list is hidden here, so the pane is the only item: it must land in the sized track. */

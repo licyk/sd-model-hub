@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useModelDetail } from '@/api/queries/sources';
 import type { ModelFile } from '@/api/types';
+import MarkdownContent from '@/components/MarkdownContent.vue';
 import PreviewImage from '@/components/PreviewImage.vue';
 import { formatBytes, formatCount } from '@/format';
 import { useI18n } from '@/i18n';
@@ -24,14 +25,6 @@ watch(
 const version = computed(() => detail.data.value?.versions.find((v) => v.id === versionId.value) ?? detail.data.value?.versions[0]);
 const versionOptions = computed(() => (detail.data.value?.versions ?? []).map((v) => ({ value: v.id, label: v.base_model_label ? `${v.name} · ${v.base_model_label}` : v.name })));
 const images = computed(() => (version.value?.images.length ? version.value.images : (detail.data.value?.images ?? [])).slice(0, 8));
-
-/** Source descriptions are HTML from third parties: render text only, never raw HTML. */
-const descriptionText = computed(() => {
-  const html = detail.data.value?.description;
-  if (!html) return '';
-  const doc = new DOMParser().parseFromString(html.replace(/<(br|\/p|\/h\d|\/li)>/gi, '\n$&'), 'text/html');
-  return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
-});
 
 async function copy(text: string) {
   await navigator.clipboard?.writeText(text);
@@ -96,11 +89,12 @@ async function copy(text: string) {
         </ul>
       </section>
 
-      <template v-if="descriptionText">
+      <template v-if="detail.data.value.description">
         <Divider />
         <section>
           <h3 class="type-title-small">{{ t('detail.description') }}</h3>
-          <p class="type-body-medium description">{{ descriptionText }}</p>
+          <!-- Civitai sends HTML, GitHub and OpenModelDB send Markdown: the renderer takes both and sanitises the result. -->
+          <MarkdownContent :text="detail.data.value.description" class="description" />
         </section>
       </template>
       <p v-if="detail.data.value.license" class="type-body-small muted">{{ t('detail.license') }}: {{ detail.data.value.license }}</p>
@@ -129,7 +123,7 @@ h3 { margin: 0 0 var(--app-space-2); }
 .file-text { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; }
 .file-actions { display: flex; align-items: center; gap: var(--app-space-2); margin-left: auto; }
 .name { overflow-wrap: anywhere; }
-.description { white-space: pre-line; margin: 0; max-height: 320px; overflow: auto; overflow-wrap: anywhere; }
+.description { max-height: 400px; overflow: auto; }
 .error { color: var(--md-sys-color-error); }
 @media (max-width: 599px) {
   .gallery { grid-auto-columns: 132px; }
